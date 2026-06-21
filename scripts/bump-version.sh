@@ -5,15 +5,15 @@
 set -euo pipefail
 
 VERSION="${1:?usage: bump-version.sh <upstream-version>}"
-[ -z "$VERSION" ] && die "version must not be empty"
-VERSION="${VERSION#v}"   # strip leading v if present
+VERSION="${VERSION#v}"
 BRANCH="pr/opencode-release/v${VERSION}"
 TARGET="${2:-main}"
 
 log() { echo "[bump] $*"; }
 die() { echo "[bump] error: $*" >&2; exit 1; }
 
-# Check if an open PR already exists for this version
+[ -z "$VERSION" ] && die "version must not be empty"
+
 pr_exists() {
   local urls
   urls=$(gh pr list --state open --label "opencode-release" --json url -q '.[].url' \
@@ -38,7 +38,6 @@ update_pr() {
   local body="Automatic version bump for opencode ${VERSION}.\n\nChangelog:\nhttps://github.com/anomalyco/opencode/releases/tag/v${VERSION}\n\n> This PR was created automatically by a scheduled workflow."
 
   gh pr edit \
-    --head "$BRANCH" \
     --title "$title" \
     --body "$body"
 }
@@ -46,6 +45,16 @@ update_pr() {
 log "Checking for existing PR for v${VERSION}..."
 
 git fetch origin "$BRANCH" 2>/dev/null && git checkout "$BRANCH" || git checkout -b "$BRANCH"
+
+echo "$VERSION" > version.txt
+
+if git diff --quiet HEAD -- version.txt; then
+  log "version.txt already up to date"
+else
+  git add version.txt
+  git commit -m "feat: opencode release v${VERSION}"
+  git push origin "$BRANCH"
+fi
 
 if pr_exists; then
   log "PR for v${VERSION} already exists, updating..."

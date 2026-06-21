@@ -1,11 +1,11 @@
 # Automated check for upstream opencode releases.
-# Runs every hour.
+# Runs every 12 hours.
 # If a new release is found, bumps version.txt and opens a PR.
 name: "opencode release checker"
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 */12 * * *"
   workflow_dispatch:
 
 permissions:
@@ -50,6 +50,7 @@ jobs:
       - name: Bump and create PR
         if: steps.latest.outputs.version != steps.current.outputs.version
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_VERSION: ${{ steps.latest.outputs.version }}
         run: |
           ./scripts/bump-version.sh "$PR_VERSION" "${{ env.TARGET_BRANCH }}"
