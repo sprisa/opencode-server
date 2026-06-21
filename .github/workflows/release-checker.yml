@@ -53,4 +53,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_VERSION: ${{ steps.latest.outputs.version }}
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           ./scripts/bump-version.sh "$PR_VERSION" "${{ env.TARGET_BRANCH }}"
