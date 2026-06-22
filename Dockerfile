@@ -74,12 +74,17 @@ RUN echo 'opencode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/opencode \
   && chmod 0440 /etc/sudoers.d/opencode \
   && visudo -cf /etc/sudoers.d/opencode
 
+# Homebrew package manager for Linux — installed system-wide, not under the
+# persistent home volume, so it survives container restarts.
+RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+  && chown -R opencode:opencode /home/linuxbrew
+
 # `n` CLI for runtime Node version switches.
 RUN curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master/bin/n \
   && chmod 0755 /usr/local/bin/n
 ARG NODE_PREFIX
 ENV N_PREFIX=${NODE_PREFIX}
-ENV PATH=${N_PREFIX}/bin:/home/opencode/.local/bin:${PATH}
+ENV PATH=${N_PREFIX}/bin:/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}
 
 # Toolchains from builder (no installer residue).
 COPY --from=builder --chown=opencode:opencode ${NODE_PREFIX} ${NODE_PREFIX}
@@ -87,7 +92,7 @@ COPY --from=builder /opt/opencode /usr/local/bin/opencode
 RUN node --version && npm --version && opencode --version
 
 # Ensure login shells pick up NODE_PREFIX on PATH.
-RUN printf 'export N_PREFIX=%s\nfor d in "$N_PREFIX/bin" "$HOME/.local/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' "${N_PREFIX}" > /etc/profile.d/node-path.sh \
+RUN printf 'export N_PREFIX=%s\nfor d in "$N_PREFIX/bin" "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' "${N_PREFIX}" > /etc/profile.d/node-path.sh \
   && chmod 0644 /etc/profile.d/node-path.sh
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
