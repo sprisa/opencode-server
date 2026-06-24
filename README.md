@@ -10,8 +10,8 @@ A general-purpose Ubuntu Docker image for running [opencode](https://opencode.ai
 | **User** | `opencode` (uid/gid 1000), passwordless sudo |
 | **opencode** | Pinned in `version.txt` as `OPENCODE_VERSION` build arg |
 | **Node.js** | Current LTS via `n`, installed to `/opt/n` (outside home) |
-| **Python 3** | pip, venv |
 | **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
+| **Python 3** | Lazy-installed via mise (see table below) |
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
 | **mise** | Dev tool manager — tools listed below install on first use via `brew` backend |
 | **CLI utilities** | git, curl, less, unzip, ssh client |
@@ -32,6 +32,7 @@ These tools install on first use (via mise → Homebrew):
 | Wget | `wget` | brew |
 | Vim | `vim` | brew |
 | Nano | `nano` | brew |
+| Python 3 | `python3` | brew |
 
 `n` and `node` are also in the config but pre-installed — included so mise can manage version switches at runtime.
 

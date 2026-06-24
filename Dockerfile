@@ -26,7 +26,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git openssh-client unzip xz-utils \
       build-essential pkg-config \
-      python3 python3-pip python3-venv \
       less sudo tini open-iscsi tzdata locales \
   && rm -rf /var/lib/apt/lists/* \
   && userdel --remove ubuntu 2>/dev/null || true; \

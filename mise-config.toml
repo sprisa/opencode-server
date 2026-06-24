@@ -10,3 +10,4 @@
 "brew:wget" = "latest"
 "brew:vim" = "latest"
 "brew:nano" = "latest"
+"brew:python" = "latest"
