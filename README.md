@@ -13,7 +13,7 @@ A general-purpose Ubuntu Docker image for running [opencode](https://opencode.ai
 | **Python 3** | pip, venv |
 | **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH for all users |
-| **CLI utilities** | git, curl, wget, jq, ripgrep, fd-find, vim, nano, less, unzip, ssh client |
+| **CLI utilities** | git, curl, wget, gh (GitHub CLI), jq, ripgrep, fd-find, vim, nano, less, unzip, ssh client |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
 
 ## Usage
