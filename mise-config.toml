@@ -2,7 +2,6 @@
 "brew:gh" = "latest"
 "brew:glab" = "latest"
 "brew:ruby" = "latest"
-"brew:jq" = "latest"
 "brew:ripgrep" = "latest"
 "brew:fd" = "latest"
 "brew:wget" = "latest"

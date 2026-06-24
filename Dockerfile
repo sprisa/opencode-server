@@ -23,7 +23,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # General dev toolchain: VCS, build tools, languages, CLI utilities.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git openssh-client unzip xz-utils \
-      build-essential pkg-config \
+      build-essential jq pkg-config \
       less sudo tini tzdata locales \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
   && userdel --remove ubuntu 2>/dev/null || true; \
@@ -54,7 +54,6 @@ RUN mkdir -p /home/linuxbrew \
   && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew cleanup --prune=all \
   && sudo -u opencode rm -rf "$(sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew --cache)" \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test \
-  && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/cask \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/cache \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/doc \
   && rm -rf /home/linuxbrew/.linuxbrew/share/man \

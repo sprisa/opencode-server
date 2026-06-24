@@ -13,7 +13,7 @@ A general-purpose Ubuntu Docker image for running [opencode](https://opencode.ai
 | **Python 3** | Lazy-installed via mise (see table below) |
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
 | **mise** | Dev tool manager — tools listed below install on first use via `brew` backend |
-| **CLI utilities** | git, curl, less, unzip, ssh client |
+| **CLI utilities** | git, curl, jq, less, unzip, ssh client |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
 
 ### Lazy-installed tools
@@ -25,7 +25,6 @@ These tools install on first use (via mise → Homebrew):
 | GitHub CLI | `gh` | brew |
 | GitLab CLI | `glab` | brew |
 | Ruby | `ruby` | brew |
-| jq | `jq` | brew |
 | ripgrep | `rg` | brew |
 | fd | `fd` | brew |
 | Wget | `wget` | brew |
