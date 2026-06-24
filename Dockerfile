@@ -85,7 +85,6 @@ ENV PATH=/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbre
 ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
-ENV MISE_GLOBAL_CONFIG_FILE=/home/opencode/.config/mise/config.toml
 ENV MISE_ALWAYS_INSTALL=1
 
 # Runtimes copied from builder (most-stable first so frequent version
@@ -96,7 +95,7 @@ COPY --from=builder /opt/opencode /usr/local/bin/opencode
 # Mise — dev tool manager; auto-installs tools defined in the global config.
 COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
 COPY --from=builder --chown=opencode:opencode /opt/mise /opt/mise
-COPY --chown=opencode:opencode mise-config.toml /home/opencode/.config/mise/config.toml
+COPY mise-config.toml /etc/mise/config.toml
 
 # Verify runtime and set up login-shell PATH and auto-install handler
 RUN opencode --version \

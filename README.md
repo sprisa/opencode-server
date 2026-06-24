@@ -35,7 +35,7 @@ These tools install on first use (via mise → Homebrew):
 | n | `n` | brew |
 | Node.js | `node` | brew |
 
-Add more tools to `~/.config/mise/config.toml` to extend the list.
+The image ships with a system config at `/etc/mise/config.toml` with these pre-approved tools. Users can add or override tools by creating `~/.config/mise/config.toml` — mise merges both.
 
 ## Usage
 
@@ -105,4 +105,4 @@ Fetches the latest release from [anomalyco/opencode](https://github.com/anomalyc
 - `~/.local/bin` is on PATH and user-writable, useful for dropping custom tools at runtime.
 - Node version can be switched at runtime with `n <version>` (e.g. `n lts`).
 - Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume). It uses its bundled portable Ruby — no system Ruby needed.
-- **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via Homebrew on first use. Edit `~/.config/mise/config.toml` to add more.
+- **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via Homebrew on first use. The image ships defaults in `/etc/mise/config.toml`; create `~/.config/mise/config.toml` to add your own — mise merges both.
