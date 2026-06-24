@@ -93,6 +93,7 @@ jobs:
             BASELINE_BYTES=${{ steps.baseline-size.outputs.bytes }}
             DIFF_BYTES=$(( PR_BYTES - BASELINE_BYTES ))
             if [ "$DIFF_BYTES" -ge 0 ]; then SIGN="+"; else SIGN=""; fi
+            DIFF_HUMAN=$(numfmt --to=iec --suffix=B "$DIFF_BYTES" 2>/dev/null || echo "${DIFF_BYTES} B")
           fi
 
           {
@@ -104,7 +105,7 @@ jobs:
 
             if [ "${{ steps.check-diff.outputs.changed }}" = "true" ]; then
               echo "| Baseline (main) | $BASELINE_HUMAN |"
-              echo "| **Difference** | **${SIGN}${DIFF_BYTES} bytes** |"
+              echo "| **Difference** | **${SIGN}${DIFF_HUMAN}** |"
             fi
 
             echo ""
@@ -120,6 +121,11 @@ jobs:
           echo "pr: $PR_HUMAN ($PR_BYTES bytes)"
 
           echo "pr-human=${PR_HUMAN}" >> "$GITHUB_OUTPUT"
+          if [ "$DIFF_BYTES" -ge 0 ]; then
+            echo "diff-human=+${DIFF_HUMAN}" >> "$GITHUB_OUTPUT"
+          else
+            echo "diff-human=${DIFF_HUMAN}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
@@ -139,7 +145,7 @@ jobs:
 
           if [ "${{ steps.check-diff.outputs.changed }}" = "true" ]; then
             BASELINE_HUMAN="${{ steps.baseline-size.outputs.human }}"
-            DIFF="${{ steps.compare.outputs.diff-bytes }}"
+            DIFF="${{ steps.compare.outputs.diff-human }}"
             BODY=$(cat <<EOF
           ## Docker image size comparison
 
@@ -147,7 +153,7 @@ jobs:
           |---|---|
           | Baseline (main) | $BASELINE_HUMAN |
           | This PR | $PR_HUMAN |
-          | **Difference** | **${DIFF} bytes** |
+          | **Difference** | **${DIFF}** |
           EOF
             )
           fi
