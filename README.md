@@ -29,6 +29,7 @@ These tools install on first use (via mise → Homebrew):
 | fd | `fd` | brew |
 | Wget | `wget` | brew |
 | Vim | `vim` | brew |
+| Micro | `micro` | brew |
 | Nano | `nano` | brew |
 | Python 3 | `python3` | brew |
 | n | `n` | brew |
