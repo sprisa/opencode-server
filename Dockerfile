@@ -80,7 +80,14 @@ RUN echo 'opencode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/opencode \
 # (and during BuildKit builds it cannot detect it is inside a container).
 RUN mkdir -p /home/linuxbrew \
   && chown opencode:opencode /home/linuxbrew \
-  && su opencode -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+  && su opencode -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' \
+  && su opencode -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" \
+      && brew cleanup --prune=all \
+      && rm -rf "$(brew --cache)" \
+      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/homebrew/homebrew-core \
+      && rm -rf /home/linuxbrew/.linuxbrew/share/man \
+      && rm -rf /home/linuxbrew/.linuxbrew/share/doc \
+      && rm -rf /home/linuxbrew/.linuxbrew/share/zsh'
 
 # `n` CLI for runtime Node version switches.
 RUN curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master/bin/n \
