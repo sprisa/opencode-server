@@ -1,8 +1,6 @@
 [tools]
 "brew:gh" = "latest"
 "brew:glab" = "latest"
-"brew:n" = "latest"
-"brew:node" = "latest"
 "brew:ruby" = "latest"
 "brew:jq" = "latest"
 "brew:ripgrep" = "latest"

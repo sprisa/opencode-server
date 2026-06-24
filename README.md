@@ -34,8 +34,6 @@ These tools install on first use (via mise → Homebrew):
 | Nano | `nano` | brew |
 | Python 3 | `python3` | brew |
 
-`n` and `node` are also in the config but pre-installed — included so mise can manage version switches at runtime.
-
 Add more tools to `~/.config/mise/config.toml` to extend the list.
 
 ## Usage
