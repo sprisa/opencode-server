@@ -101,11 +101,19 @@ COPY mise-config.toml /etc/mise/config.toml
 RUN opencode --version \
   && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
   && chmod 0644 /etc/profile.d/brew-path.sh \
-  && printf '\neval "$(mise activate bash --shims)"\n' >> /home/opencode/.bashrc \
-  && printf '\neval "$(mise activate zsh --shims)"\n' >> /home/opencode/.zshrc \
+  && printf '\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
+  && printf '\neval "$(mise activate zsh)"\n' >> /home/opencode/.zshrc \
   && mkdir -p /home/opencode/.config/fish \
-  && printf '\nmise activate fish --shims | source\n' >> /home/opencode/.config/fish/config.fish \
-  && printf '\neval "$(mise activate sh --shims)"\n' >> /home/opencode/.profile
+  && printf '\nmise activate fish | source\n' >> /home/opencode/.config/fish/config.fish \
+  && printf '\neval "$(mise activate sh)"\n' >> /home/opencode/.profile \
+  && mkdir -p /opt/mise/shims \
+  && grep -E '^\s*"' /etc/mise/config.toml | while IFS='=' read -r key value; do \
+       key="$(echo "$key" | tr -d ' "')" \
+     && shim="${key#*:}" \
+     && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "%s" -- "$@"\n' "$key" > "/opt/mise/shims/$shim" \
+     && chmod 0755 "/opt/mise/shims/$shim"; \
+     done \
+  && chown -R opencode:opencode /opt/mise/shims
 
 USER opencode
 ENV HOME=/home/opencode
