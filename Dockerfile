@@ -28,22 +28,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip python3-venv ruby \
       ripgrep fd-find jq less nano vim-tiny \
       sudo tini open-iscsi tzdata locales \
-  && rm -rf /var/lib/apt/lists/*
-
-# GitHub CLI (official apt repo).
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-    | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-    > /etc/apt/sources.list.d/github-cli.list \
-  && apt-get update && apt-get install -y --no-install-recommends gh \
-  && rm -rf /var/lib/apt/lists/*
-
-RUN userdel --remove ubuntu 2>/dev/null || true; \
-    groupdel ubuntu 2>/dev/null || true; \
-    groupadd --gid 1000 opencode \
-  && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash opencode
-
-RUN echo 'opencode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/opencode \
+      > /etc/apt/sources.list.d/github-cli.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends gh \
+  && rm -rf /var/lib/apt/lists/* \
+  && userdel --remove ubuntu 2>/dev/null || true; \
+     groupdel ubuntu 2>/dev/null || true; \
+     groupadd --gid 1000 opencode \
+  && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash opencode \
+  && echo 'opencode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/opencode \
   && chmod 0440 /etc/sudoers.d/opencode \
   && visudo -cf /etc/sudoers.d/opencode
 
@@ -99,9 +95,8 @@ COPY --from=builder --chown=opencode:opencode ${NODE_PREFIX} ${NODE_PREFIX}
 COPY --from=builder /opt/opencode /usr/local/bin/opencode
 COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
 
-RUN node --version && npm --version && opencode --version
-
-RUN printf 'export N_PREFIX=%s\nfor d in "$N_PREFIX/bin" "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' "${N_PREFIX}" > /etc/profile.d/node-path.sh \
+RUN node --version && npm --version && opencode --version \
+  && printf 'export N_PREFIX=%s\nfor d in "$N_PREFIX/bin" "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' "${N_PREFIX}" > /etc/profile.d/node-path.sh \
   && chmod 0644 /etc/profile.d/node-path.sh
 
 USER opencode
