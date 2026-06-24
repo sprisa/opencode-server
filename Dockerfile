@@ -43,7 +43,10 @@ RUN curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash 
   && /opt/opencode --version
 
 # Homebrew installed here so build-time tools never land in the final image
-RUN useradd --create-home --shell /bin/bash opencode \
+RUN apt-get update && apt-get install -y --no-install-recommends sudo \
+  && useradd --create-home --shell /bin/bash opencode \
+  && echo 'opencode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/opencode \
+  && chmod 0440 /etc/sudoers.d/opencode \
   && mkdir -p /home/linuxbrew \
   && chown opencode:opencode /home/linuxbrew \
   && su opencode -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' \
