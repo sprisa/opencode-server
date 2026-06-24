@@ -1,4 +1,5 @@
-# Build the Docker image on pull requests and report its size.
+# Build the Docker image on pull requests and report its size,
+# compared against the base branch (main).
 name: PR build
 
 on:
@@ -10,37 +11,97 @@ jobs:
     name: Build and report size
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout base branch (baseline)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref || github.ref_name }}
+          path: baseline
 
-      - name: Read version
-        id: version
+      - name: Read version (baseline)
+        id: version-base
         run: |
-          VERSION=$(cat version.txt | tr -d '[:space:]')
+          VERSION=$(cat baseline/version.txt | tr -d '[:space:]')
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "OPENCODE_VERSION=${VERSION}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build image
+      - name: Build baseline image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: baseline
           load: true
-          build-args: OPENCODE_VERSION=${{ steps.version.outputs.version }}
+          build-args: OPENCODE_VERSION=${{ steps.version-base.outputs.version }}
+          tags: sprisa/opencode:baseline
+
+      - name: Record baseline size
+        id: baseline-size
+        run: echo "size=$(docker images sprisa/opencode:baseline --format '{{.Size}}')" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          path: head
+          ref: ${{ github.head_ref || '' }}
+
+      - name: Determine PR context
+        id: pr-context
+        run: |
+          if [ -n "${{ github.head_ref }}" ]; then
+            echo "dir=head" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Read version (PR)
+        id: version-pr
+        run: |
+          VERSION=$(cat ${{ steps.pr-context.outputs.dir }}/version.txt | tr -d '[:space:]')
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build PR image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.pr-context.outputs.dir }}
+          load: true
+          build-args: OPENCODE_VERSION=${{ steps.version-pr.outputs.version }}
           tags: sprisa/opencode:pr-${{ github.event.number || 'manual' }}
 
-      - name: Report image size
+      - name: Compare and report image sizes
         run: |
           TAG="pr-${{ github.event.number || 'manual' }}"
-          SIZE=$(docker images "sprisa/opencode:${TAG}" --format "{{.Size}}")
-          echo "### Image size: $SIZE" >> "$GITHUB_STEP_SUMMARY"
+          BASELINE="${{ steps.baseline-size.outputs.size }}"
+          CURRENT=$(docker images "sprisa/opencode:${TAG}" --format "{{.Size}}")
+
+          baseline_bytes=$(echo "$BASELINE" | numfmt --from=iec 2>/dev/null || echo 0)
+          current_bytes=$(echo "$CURRENT" | numfmt --from=iec 2>/dev/null || echo 0)
+          diff=$(( current_bytes - baseline_bytes ))
+          if [ "$diff" -ge 0 ]; then sign="+"; else sign=""; fi
+
+          echo "## Image size comparison" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Baseline (main) | $BASELINE |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| This PR | $CURRENT |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Difference | ${sign}${diff} bytes |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Baseline layers" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Layer | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          docker history sprisa/opencode:baseline \
+            --format "| {{.CreatedSince}} | {{.Size}} |" \
+            --no-trunc | tail -n +2 >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### PR layers" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Layer | Size |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           docker history "sprisa/opencode:${TAG}" \
             --format "| {{.CreatedSince}} | {{.Size}} |" \
-            --no-trunc \
-            | tail -n +2 >> "$GITHUB_STEP_SUMMARY"
-          echo "built: $SIZE"
+            --no-trunc | tail -n +2 >> "$GITHUB_STEP_SUMMARY"
+
+          echo "baseline: $BASELINE"
+          echo "pr: $CURRENT"
+          echo "diff: ${sign}${diff} bytes"
