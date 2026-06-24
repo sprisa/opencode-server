@@ -9,3 +9,5 @@
 "brew:vim" = "latest"
 "brew:nano" = "latest"
 "brew:python" = "latest"
+"brew:n" = "latest"
+"brew:node" = "latest"

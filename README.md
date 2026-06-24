@@ -9,7 +9,6 @@ A general-purpose Ubuntu Docker image for running [opencode](https://opencode.ai
 | **Base OS** | ubuntu:26.04 |
 | **User** | `opencode` (uid/gid 1000), passwordless sudo |
 | **opencode** | Pinned in `version.txt` as `OPENCODE_VERSION` build arg |
-| **Node.js** | Current LTS via `n`, installed to `/opt/n` (outside home) |
 | **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
 | **Python 3** | Lazy-installed via mise (see table below) |
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
@@ -33,6 +32,8 @@ These tools install on first use (via mise → Homebrew):
 | Vim | `vim` | brew |
 | Nano | `nano` | brew |
 | Python 3 | `python3` | brew |
+| n | `n` | brew |
+| Node.js | `node` | brew |
 
 Add more tools to `~/.config/mise/config.toml` to extend the list.
 
@@ -104,4 +105,4 @@ Fetches the latest release from [anomalyco/opencode](https://github.com/anomalyc
 - `~/.local/bin` is on PATH and user-writable, useful for dropping custom tools at runtime.
 - Node version can be switched at runtime with `n <version>` (e.g. `n lts`).
 - Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume). It uses its bundled portable Ruby — no system Ruby needed.
-- **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via Homebrew on first use. Edit `/etc/mise/config.toml` to add more.
+- **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via Homebrew on first use. Edit `~/.config/mise/config.toml` to add more.
