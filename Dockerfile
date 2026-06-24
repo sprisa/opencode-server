@@ -22,6 +22,8 @@ FROM ubuntu:26.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# General dev toolchain: VCS, build tools, languages, CLI utilities.
+# Also installs GitHub CLI via its official apt repo.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl wget git openssh-client unzip xz-utils \
       build-essential pkg-config \
@@ -43,17 +45,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && chmod 0440 /etc/sudoers.d/opencode \
   && visudo -cf /etc/sudoers.d/opencode
 
+# Entrypoint (tini + init script)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod 0755 /usr/local/bin/entrypoint.sh
 
 # ---------------------------------------------------------------------------
-# builder: fetch Node, opencode, and Homebrew
+# builder: fetch Node, opencode, and Homebrew (layers are ephemeral —
+# only what's explicitly COPIED to final lands in the runtime image)
 # ---------------------------------------------------------------------------
 FROM base AS builder
 
 ARG NODE_PREFIX
 ENV N_PREFIX=${NODE_PREFIX}
 ENV PATH=${NODE_PREFIX}/bin:${PATH}
+
+# Node.js via `n` (version manager)
 RUN curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master/bin/n \
   && chmod 0755 /usr/local/bin/n \
   && mkdir -p "${N_PREFIX}" \
@@ -61,12 +67,15 @@ RUN curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master
   && node --version && npm --version
 
 ARG OPENCODE_VERSION
+
+# opencode server binary
 RUN curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash \
   && (cp /root/.opencode/bin/opencode /opt/opencode 2>/dev/null \
       || cp "$HOME/.opencode/bin/opencode" /opt/opencode) \
   && chmod 0755 /opt/opencode \
   && /opt/opencode --version
 
+# Homebrew package manager — install and strip unnecessary data
 RUN mkdir -p /home/linuxbrew \
   && chown opencode:opencode /home/linuxbrew \
   && sudo -u opencode NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
@@ -83,7 +92,7 @@ RUN mkdir -p /home/linuxbrew \
   && rm -rf /home/linuxbrew/.linuxbrew/share/zsh
 
 # ---------------------------------------------------------------------------
-# final: runtime image
+# final: runtime image — only the base layer plus copied-in toolchains
 # ---------------------------------------------------------------------------
 FROM base
 
@@ -91,10 +100,12 @@ ARG NODE_PREFIX
 ENV N_PREFIX=${NODE_PREFIX}
 ENV PATH=${N_PREFIX}/bin:/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}
 
+# Runtimes copied from builder (no installer residue)
 COPY --from=builder --chown=opencode:opencode ${NODE_PREFIX} ${NODE_PREFIX}
 COPY --from=builder /opt/opencode /usr/local/bin/opencode
 COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
 
+# Verify runtimes and set up login-shell PATH
 RUN node --version && npm --version && opencode --version \
   && printf 'export N_PREFIX=%s\nfor d in "$N_PREFIX/bin" "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' "${N_PREFIX}" > /etc/profile.d/node-path.sh \
   && chmod 0644 /etc/profile.d/node-path.sh
