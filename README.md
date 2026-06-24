@@ -12,8 +12,9 @@ A general-purpose Ubuntu Docker image for running [opencode](https://opencode.ai
 | **Node.js** | Current LTS via `n`, installed to `/opt/n` (outside home) |
 | **Python 3** | pip, venv |
 | **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
-| **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH for all users |
-| **CLI utilities** | git, curl, wget, gh (GitHub CLI), jq, ripgrep, fd-find, vim, nano, less, unzip, ssh client |
+| **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
+| **mise** | Dev tool manager (`mise activate bash`); pre-approved tools (gh, glab, n, node) auto-install via `brew` backend on first use |
+| **CLI utilities** | git, curl, wget, jq, ripgrep, fd-find, vim, nano, less, unzip, ssh client |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
 
 ## Usage
@@ -84,3 +85,4 @@ Fetches the latest release from [anomalyco/opencode](https://github.com/anomalyc
 - `~/.local/bin` is on PATH and user-writable, useful for dropping custom tools at runtime.
 - Node version can be switched at runtime with `n <version>` (e.g. `n lts`).
 - Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume) and is usable immediately by the `opencode` user.
+- **mise auto-install**: [mise](https://mise.jdx.dev) is activated on shell start. Pre-approved tools (gh, glab, n, node) defined in `/etc/mise/config.toml` auto-install via the `brew` backend on first invocation. Add more tools to the config to extend the list.
