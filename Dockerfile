@@ -8,8 +8,9 @@
 # shadowed when a volume mounts over the home directory.
 #
 # Multi-stage: the `builder` stage fetches relocatable toolchains (Node via `n`,
-# the opencode binary) so installers and caches never land in the final image.
-# The final stage carries only the runtime: apt dev packages + copied-in Node + opencode.
+# the opencode binary, Homebrew) so installers and caches never land in the
+# final image. The final stage carries only the runtime: apt dev packages +
+# copied-in Node + opencode + Homebrew.
 
 ARG OPENCODE_VERSION=0.0.0
 # Node lives OUTSIDE /home/opencode so it's never shadowed by a volume mount
@@ -17,12 +18,12 @@ ARG OPENCODE_VERSION=0.0.0
 ARG NODE_PREFIX=/opt/n
 
 # ---------------------------------------------------------------------------
-# builder: fetch Node (via n) + the opencode binary
+# builder: fetch Node (via n) + the opencode binary + Homebrew
 # ---------------------------------------------------------------------------
 FROM ubuntu:26.04 AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl xz-utils bash libatomic1 \
+      ca-certificates curl xz-utils bash libatomic1 ruby \
   && rm -rf /var/lib/apt/lists/*
 
 ARG NODE_PREFIX
@@ -40,6 +41,24 @@ RUN curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash 
       || cp "$HOME/.opencode/bin/opencode" /opt/opencode) \
   && chmod 0755 /opt/opencode \
   && /opt/opencode --version
+
+# Homebrew installed here so build-time tools never land in the final image
+RUN useradd --create-home --shell /bin/bash opencode \
+  && mkdir -p /home/linuxbrew \
+  && chown opencode:opencode /home/linuxbrew \
+  && su opencode -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' \
+  && su opencode -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" \
+      && brew cleanup --prune=all \
+      && rm -rf "$(brew --cache)" \
+      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/homebrew/homebrew-core \
+      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test \
+      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/cask \
+      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/cache \
+      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/doc \
+      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/portable-ruby \
+      && rm -rf /home/linuxbrew/.linuxbrew/share/man \
+      && rm -rf /home/linuxbrew/.linuxbrew/share/doc \
+      && rm -rf /home/linuxbrew/.linuxbrew/share/zsh'
 
 # ---------------------------------------------------------------------------
 # final: the sandbox runtime
@@ -74,24 +93,8 @@ RUN echo 'opencode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/opencode \
   && chmod 0440 /etc/sudoers.d/opencode \
   && visudo -cf /etc/sudoers.d/opencode
 
-# Homebrew package manager for Linux — installed system-wide, not under the
-# persistent home volume, so it survives container restarts.
-# Run as the opencode user because the installer aborts when run as root
-# (and during BuildKit builds it cannot detect it is inside a container).
-RUN mkdir -p /home/linuxbrew \
-  && chown opencode:opencode /home/linuxbrew \
-  && su opencode -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' \
-  && su opencode -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" \
-      && brew cleanup --prune=all \
-      && rm -rf "$(brew --cache)" \
-      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/homebrew/homebrew-core \
-      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test \
-      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/cache \
-      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/doc \
-      && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/portable-ruby \
-      && rm -rf /home/linuxbrew/.linuxbrew/share/man \
-      && rm -rf /home/linuxbrew/.linuxbrew/share/doc \
-      && rm -rf /home/linuxbrew/.linuxbrew/share/zsh'
+# Homebrew from builder (no installer residue or macOS-only code).
+COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
 
 # `n` CLI for runtime Node version switches.
 RUN curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master/bin/n \
