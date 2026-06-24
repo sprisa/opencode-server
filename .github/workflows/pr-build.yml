@@ -152,5 +152,12 @@ jobs:
           EOF
           )
 
-          gh pr comment "$PR_NUM" --body "$BODY" --edit-last 2>/dev/null \
-            || gh pr comment "$PR_NUM" --body "$BODY"
+          COMMENT_ID=$(gh api "/repos/${{ github.repository }}/issues/${PR_NUM}/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | .id' | head -1)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api "/repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              -X PATCH -f body="$BODY" --silent
+          else
+            gh pr comment "$PR_NUM" --body "$BODY"
+          fi
