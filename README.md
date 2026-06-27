@@ -1,5 +1,10 @@
 # sprisa/opencode
 
+[![Docker Image Version](https://img.shields.io/docker/v/sprisa/opencode)](https://hub.docker.com/r/sprisa/opencode)  [![Docker Pulls](https://img.shields.io/docker/pulls/sprisa/opencode)](https://hub.docker.com/r/sprisa/opencode)
+
+
+
+
 A general-purpose Ubuntu Docker image for running [opencode](https://opencode.ai). Published to Docker Hub as `sprisa/opencode:<version>` where `<version>` matches the release pinned in `version.txt`.
 
 ## What's inside
