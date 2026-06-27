@@ -9,12 +9,32 @@ A general-purpose Ubuntu Docker image for running [opencode](https://opencode.ai
 | **Base OS** | ubuntu:26.04 |
 | **User** | `opencode` (uid/gid 1000), passwordless sudo |
 | **opencode** | Pinned in `version.txt` as `OPENCODE_VERSION` build arg |
-| **Node.js** | Current LTS via `n`, installed to `/opt/n` (outside home) |
-| **Python 3** | pip, venv |
 | **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
-| **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH for all users |
-| **CLI utilities** | git, curl, wget, gh (GitHub CLI), jq, ripgrep, fd-find, vim, nano, less, unzip, ssh client |
+| **Python 3** | Lazy-installed via mise (see table below) |
+| **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
+| **mise** | Dev tool manager — tools listed below install on first use via `brew` backend |
+| **CLI utilities** | git, curl, jq, less, unzip, ssh client |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
+
+### Lazy-installed tools
+
+These tools install on first use (via mise → Homebrew):
+
+| Tool | Command | Backend |
+|---|---|---|
+| GitHub CLI | `gh` | brew |
+| GitLab CLI | `glab` | brew |
+| Ruby | `ruby` | brew |
+| ripgrep | `rg` | brew |
+| fd | `fd` | brew |
+| Wget | `wget` | brew |
+| Vim | `vim` | brew |
+| Micro | `micro` | brew |
+| Nano | `nano` | brew |
+| Python 3 | `python3` | brew |
+| Node.js | `node` | brew |
+
+The image ships with a system config at `/etc/mise/config.toml` with these pre-approved tools. Users can add or override tools by creating `~/.config/mise/config.toml` — mise merges both.
 
 ## Usage
 
@@ -83,4 +103,5 @@ Fetches the latest release from [anomalyco/opencode](https://github.com/anomalyc
 - The root filesystem is ephemeral; mount `/home/opencode` as the persistent volume for all user data (dotfiles, config, projects). The `~/workspace` subdirectory is the default workdir.
 - `~/.local/bin` is on PATH and user-writable, useful for dropping custom tools at runtime.
 - Node version can be switched at runtime with `n <version>` (e.g. `n lts`).
-- Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume) and is usable immediately by the `opencode` user.
+- Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume). It uses its bundled portable Ruby — no system Ruby needed.
+- **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via Homebrew on first use. The image ships defaults in `/etc/mise/config.toml`; create `~/.config/mise/config.toml` to add your own — mise merges both.

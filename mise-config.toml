@@ -1,0 +1,12 @@
+[tools]
+"brew:gh" = "latest"
+"brew:glab" = "latest"
+"brew:ruby" = "latest"
+"brew:ripgrep" = "latest"
+"brew:fd" = "latest"
+"brew:wget" = "latest"
+"brew:vim" = "latest"
+"brew:micro" = "latest"
+"brew:nano" = "latest"
+"brew:python" = "latest"
+"brew:node" = "latest"

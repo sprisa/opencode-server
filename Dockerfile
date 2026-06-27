@@ -4,16 +4,14 @@
 # Ubuntu base with a broad, familiar dev toolchain. All configuration is env-driven
 # (OPENCODE_SERVER_PASSWORD, OPENCODE_CORS_ORIGIN, OPENCODE_PORT). The entire home
 # directory (/home/opencode) is the persistent mount point; the active project
-# lives under ~/workspace. Node lives in /opt/n (outside home) so it's never
-# shadowed when a volume mounts over the home directory.
+# lives under ~/workspace.
 #
 # Three-stage build:
 #   base     — apt packages, user, sudo, init — shared by builder and final
-#   builder  — fetches relocatable toolchains (Node, opencode, Homebrew)
+#   builder  — fetches relocatable toolchains (opencode, Homebrew, mise)
 #   final    — copies in runtimes from builder; carries only runtime layers
 
 ARG OPENCODE_VERSION=0.0.0
-ARG NODE_PREFIX=/opt/n
 
 # ---------------------------------------------------------------------------
 # base: common runtime layer (apt, user, sudo, init)
@@ -23,20 +21,11 @@ FROM ubuntu:26.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 
 # General dev toolchain: VCS, build tools, languages, CLI utilities.
-# Also installs GitHub CLI via its official apt repo.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl wget git openssh-client unzip xz-utils \
-      build-essential pkg-config \
-      python3 python3-pip python3-venv ruby \
-      ripgrep fd-find jq less nano vim-tiny \
-      sudo tini open-iscsi tzdata locales \
-  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-      | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-      > /etc/apt/sources.list.d/github-cli.list \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends gh \
-  && rm -rf /var/lib/apt/lists/* \
+      ca-certificates curl git openssh-client unzip xz-utils \
+      build-essential jq pkg-config \
+      less sudo tini tzdata locales \
+  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
   && userdel --remove ubuntu 2>/dev/null || true; \
      groupdel ubuntu 2>/dev/null || true; \
      groupadd --gid 1000 opencode \
@@ -57,10 +46,6 @@ RUN chmod 0755 /usr/local/bin/entrypoint.sh
 # ---------------------------------------------------------------------------
 FROM base AS builder
 
-ARG NODE_PREFIX
-ENV N_PREFIX=${NODE_PREFIX}
-ENV PATH=${NODE_PREFIX}/bin:${PATH}
-
 # 1. Homebrew — the install script URL is stable; brew releases rarely
 #    invalidate the layer once installed.
 RUN mkdir -p /home/linuxbrew \
@@ -68,26 +53,23 @@ RUN mkdir -p /home/linuxbrew \
   && sudo -u opencode NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
   && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew cleanup --prune=all \
   && sudo -u opencode rm -rf "$(sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew --cache)" \
-  && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/homebrew/homebrew-core \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test \
-  && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/cask \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/cache \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/doc \
-  && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/portable-ruby \
   && rm -rf /home/linuxbrew/.linuxbrew/share/man \
   && rm -rf /home/linuxbrew/.linuxbrew/share/doc \
-  && rm -rf /home/linuxbrew/.linuxbrew/share/zsh
+  && rm -rf /home/linuxbrew/.linuxbrew/share/zsh \
+  && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/homebrew/homebrew-core
 
-# 2. Node.js via `n` — changes when the upstream LTS version bumps
-RUN curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master/bin/n \
-  && chmod 0755 /usr/local/bin/n \
-  && mkdir -p "${N_PREFIX}" \
-  && n install --cleanup current \
-  && node --version && npm --version
+# 1.5. mise — dev tool manager; pre-approved tools defined in the global config
+#     auto-install via Homebrew backend on first use at runtime.
+RUN curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh \
+  && mkdir -p /opt/mise \
+  && MISE_DATA_DIR=/opt/mise mise plugins install brew https://github.com/woutermont/mise-brew
 
 ARG OPENCODE_VERSION
 
-# 3. opencode server binary — changes on every version bump (most frequent)
+# 2. opencode server binary — changes on every version bump (most frequent)
 RUN curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash \
   && (cp /root/.opencode/bin/opencode /opt/opencode 2>/dev/null \
       || cp "$HOME/.opencode/bin/opencode" /opt/opencode) \
@@ -99,20 +81,39 @@ RUN curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash 
 # ---------------------------------------------------------------------------
 FROM base
 
-ARG NODE_PREFIX
-ENV N_PREFIX=${NODE_PREFIX}
-ENV PATH=${N_PREFIX}/bin:/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}
+ENV PATH=/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/opt/auto-install-shims:${PATH}
+ENV HOMEBREW_NO_AUTO_UPDATE=1
+ENV HOMEBREW_INSTALL_FROM_API=1
+ENV MISE_DATA_DIR=/opt/mise
+ENV MISE_ALWAYS_INSTALL=1
 
 # Runtimes copied from builder (most-stable first so frequent version
 # bumps don't invalidate cache for the other layers).
 COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
-COPY --from=builder --chown=opencode:opencode ${NODE_PREFIX} ${NODE_PREFIX}
 COPY --from=builder /opt/opencode /usr/local/bin/opencode
 
-# Verify runtimes and set up login-shell PATH
-RUN node --version && npm --version && opencode --version \
-  && printf 'export N_PREFIX=%s\nfor d in "$N_PREFIX/bin" "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' "${N_PREFIX}" > /etc/profile.d/node-path.sh \
-  && chmod 0644 /etc/profile.d/node-path.sh
+# Mise — dev tool manager; auto-installs tools defined in the global config.
+COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
+COPY --from=builder --chown=opencode:opencode /opt/mise /opt/mise
+COPY mise-config.toml /etc/mise/config.toml
+
+# Verify runtime and set up login-shell PATH and auto-install handler
+RUN opencode --version \
+  && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
+  && chmod 0644 /etc/profile.d/brew-path.sh \
+  && printf '\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
+  && printf '\neval "$(mise activate zsh)"\n' >> /home/opencode/.zshrc \
+  && mkdir -p /home/opencode/.config/fish \
+  && printf '\nmise activate fish | source\n' >> /home/opencode/.config/fish/config.fish \
+  && printf '\neval "$(mise activate sh)"\n' >> /home/opencode/.profile \
+  && mkdir -p /opt/auto-install-shims \
+  && grep -E '^\s*"' /etc/mise/config.toml | while IFS='=' read -r key value; do \
+       key="$(echo "$key" | tr -d ' "')" \
+     && shim="${key#*:}" \
+     && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "%s" -- %s "$@"\n' "$key" "$shim" > "/opt/auto-install-shims/$shim" \
+     && chmod 0755 "/opt/auto-install-shims/$shim"; \
+     done \
+  && chown -R opencode:opencode /opt/auto-install-shims
 
 USER opencode
 ENV HOME=/home/opencode

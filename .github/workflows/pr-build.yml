@@ -92,8 +92,14 @@ jobs:
             BASELINE_HUMAN="${{ steps.baseline-size.outputs.human }}"
             BASELINE_BYTES=${{ steps.baseline-size.outputs.bytes }}
             DIFF_BYTES=$(( PR_BYTES - BASELINE_BYTES ))
-            if [ "$DIFF_BYTES" -ge 0 ]; then SIGN="+"; else SIGN=""; fi
-            DIFF_HUMAN=$(numfmt --to=iec --suffix=B "$DIFF_BYTES" 2>/dev/null || echo "${DIFF_BYTES} B")
+            if [ "$DIFF_BYTES" -gt 0 ]; then
+              SIGN="+"
+              ABS_DIFF=$DIFF_BYTES
+            else
+              SIGN=""
+              ABS_DIFF=$(( -DIFF_BYTES ))
+            fi
+            DIFF_HUMAN=$(numfmt --to=iec --suffix=B "$ABS_DIFF" 2>/dev/null || echo "${ABS_DIFF} B")
           fi
 
           {
@@ -121,11 +127,7 @@ jobs:
           echo "pr: $PR_HUMAN ($PR_BYTES bytes)"
 
           echo "pr-human=${PR_HUMAN}" >> "$GITHUB_OUTPUT"
-          if [ "$DIFF_BYTES" -ge 0 ]; then
-            echo "diff-human=+${DIFF_HUMAN}" >> "$GITHUB_OUTPUT"
-          else
-            echo "diff-human=${DIFF_HUMAN}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "diff-human=${SIGN}${DIFF_HUMAN}" >> "$GITHUB_OUTPUT"
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
