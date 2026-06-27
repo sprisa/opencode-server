@@ -1,6 +1,6 @@
 # sprisa/opencode
 
-[![Docker Image Version](https://img.shields.io/docker/v/sprisa/opencode)](https://hub.docker.com/r/sprisa/opencode)  [![Docker Pulls](https://img.shields.io/docker/pulls/sprisa/opencode)](https://hub.docker.com/r/sprisa/opencode)
+[![Docker Image Version](https://img.shields.io/docker/v/sprisa/opencode)](https://hub.docker.com/r/sprisa/opencode)  [![Docker Pulls](https://img.shields.io/docker/pulls/sprisa/opencode)](https://hub.docker.com/r/sprisa/opencode) [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/opencode-server)](https://artifacthub.io/packages/search?repo=opencode-server)
 
 
 
