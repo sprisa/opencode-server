@@ -8,6 +8,7 @@ VERSION="${1:?usage: bump-version.sh <upstream-version>}"
 VERSION="${VERSION#v}"
 BRANCH="pr/opencode-release/v${VERSION}"
 TARGET="${2:-main}"
+UPSTREAM_REPO="anomalyco/opencode"
 
 log() { echo "[bump] $*"; }
 die() { echo "[bump] error: $*" >&2; exit 1; }
@@ -18,9 +19,31 @@ pr_exists() {
   gh pr list --state open --head "$BRANCH" --json url -q '.[].url' 2>/dev/null | grep -q .
 }
 
+fetch_changelog() {
+  gh api "repos/${UPSTREAM_REPO}/releases/tags/v${VERSION}" --jq '.body' 2>/dev/null || true
+}
+
+pr_body() {
+  local changelog="$1"
+  cat <<EOB
+## What's Changed
+
+${changelog}
+
+---
+
+**Full Changelog**: https://github.com/${UPSTREAM_REPO}/releases/tag/v${VERSION}
+
+> This PR was created automatically by a scheduled workflow.
+EOB
+}
+
 create_pr() {
   local title="feat: opencode release v${VERSION}"
-  local body="Automatic version bump for opencode ${VERSION}.\n\nChangelog:\nhttps://github.com/anomalyco/opencode/releases/tag/v${VERSION}\n\n> This PR was created automatically by a scheduled workflow."
+  local changelog
+  changelog="$(fetch_changelog)"
+  local body
+  body="$(pr_body "$changelog")"
 
   gh pr create \
     --title "$title" \
@@ -30,7 +53,10 @@ create_pr() {
 
 update_pr() {
   local title="feat: opencode release v${VERSION}"
-  local body="Automatic version bump for opencode ${VERSION}.\n\nChangelog:\nhttps://github.com/anomalyco/opencode/releases/tag/v${VERSION}\n\n> This PR was created automatically by a scheduled workflow."
+  local changelog
+  changelog="$(fetch_changelog)"
+  local body
+  body="$(pr_body "$changelog")"
 
   gh pr edit \
     --title "$title" \
