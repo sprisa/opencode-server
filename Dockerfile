@@ -135,9 +135,15 @@ RUN opencode --version \
   && printf '\nmise activate fish | source\n' >> /home/opencode/.config/fish/config.fish \
   && printf '\neval "$(mise activate sh)"\n' >> /home/opencode/.profile \
   && mkdir -p /opt/auto-install-shims \
-  && grep -E '^\s*"zerobrew:' /etc/mise/config.toml | while IFS='=' read -r key value; do \
+  && grep -E '^\s*"' /etc/mise/config.toml | while IFS='=' read -r key value; do \
   key="$(echo "$key" | tr -d ' "')" \
-  && shim="${key#*:}" \
+  && case "$key" in \
+     github:cli/cli) shim="gh" ;; \
+     github:BurntSushi/ripgrep) shim="rg" ;; \
+     github:facebook/sapling) shim="sl" ;; \
+     github:*) shim="${key##*/}" ;; \
+     *) shim="${key#*:}" ;; \
+     esac \
   && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "%s" -- %s "$@"\n' "$key" "$shim" > "/opt/auto-install-shims/$shim" \
   && chmod 0755 "/opt/auto-install-shims/$shim"; \
   done \
