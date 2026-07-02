@@ -1,8 +1,8 @@
 [tools]
-"github:cli/cli" = "latest"
+"github:cli/cli" = "latest"          # shim:gh
 "zerobrew:glab" = "latest"
 "zerobrew:ruby" = "latest"
-"github:BurntSushi/ripgrep" = "latest"
+"github:BurntSushi/ripgrep" = "latest"  # shim:rg
 "github:sharkdp/fd" = "latest"
 "zerobrew:wget" = "latest"
 "zerobrew:vim" = "latest"
@@ -10,4 +10,4 @@
 "zerobrew:nano" = "latest"
 "zerobrew:python" = "latest"
 "github:nodejs/node" = "latest"
-"github:facebook/sapling" = "latest"
+"github:facebook/sapling" = "latest"    # shim:sl
