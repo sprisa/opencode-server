@@ -26,6 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates curl git openssh-client unzip \
   less libatomic1 sudo tini tzdata \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
+  && rm -rf /usr/share/doc /usr/share/man /usr/share/locale \
+  && find /var/log -type f -delete 2>/dev/null; \
+  rm -f /var/cache/debconf/*.dat 2>/dev/null || true \
   && userdel --remove ubuntu 2>/dev/null || true; \
   groupdel ubuntu 2>/dev/null || true; \
   groupadd --gid 1000 opencode \
@@ -52,11 +55,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   build-essential pkg-config xz-utils \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
-# 1. Homebrew — the install script URL is stable; brew releases rarely
-#    invalidate the layer once installed.
+# 1. Homebrew — partial clone with --filter=blob:none avoids downloading
+#    all past file versions, saving ~70 MB while keeping brew update working.
 RUN mkdir -p /home/linuxbrew \
   && chown opencode:opencode /home/linuxbrew \
-  && sudo -u opencode NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+  && sudo -u opencode git clone --filter=blob:none \
+    https://github.com/Homebrew/brew /home/linuxbrew/.linuxbrew/Homebrew \
+  && sudo -u opencode mkdir -p /home/linuxbrew/.linuxbrew/bin \
+  && sudo -u opencode ln -sf \
+    /home/linuxbrew/.linuxbrew/Homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew \
+  && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew update --force \
   && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew cleanup --prune=all \
   && sudo -u opencode rm -rf "$(sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew --cache)" \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test \
