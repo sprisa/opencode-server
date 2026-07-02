@@ -39,6 +39,7 @@ These tools install on first use (via mise → zerobrew):
 | Nano | `nano` | zerobrew |
 | Python 3 | `python3` | zerobrew |
 | Node.js | `node` | zerobrew |
+| Sapling | `sl` | zerobrew |
 
 The image ships with a system config at `/etc/mise/config.toml` with these pre-approved tools. Users can add or override tools by creating `~/.config/mise/config.toml` — mise merges both.
 
