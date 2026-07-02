@@ -7,51 +7,64 @@
 # lives under ~/workspace.
 #
 # Three-stage build:
-#   base     — apt packages, user, sudo, init — shared by builder and final
-#   builder  — fetches relocatable toolchains (opencode, Homebrew, mise)
-#   final    — copies in runtimes from builder; carries only runtime layers
+#   runtime   — minimal apt packages, user, sudo, init
+#   builder   — runtime + compiler toolchain + relocatable toolchains (opencode, Homebrew, mise)
+#   final     — copies in runtimes from builder; carries only runtime layers
 
 ARG OPENCODE_VERSION=0.0.0
 ARG IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
 # ---------------------------------------------------------------------------
-# base: common runtime layer (apt, user, sudo, init)
+# runtime: minimal runtime layer (apt, user, sudo, init)
 # ---------------------------------------------------------------------------
-FROM ubuntu:26.04 AS base
+FROM ubuntu:26.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# General dev toolchain: VCS, build tools, languages, CLI utilities.
+# CLI utilities for day-to-day dev work (git, curl, etc.).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  ca-certificates curl git openssh-client unzip xz-utils \
-  build-essential jq pkg-config \
-  less sudo tini tzdata locales \
+  ca-certificates curl git unzip \
+  less libatomic1 sudo tini tzdata \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
+  && rm -rf /usr/share/doc /usr/share/man /usr/share/locale \
   && userdel --remove ubuntu 2>/dev/null || true; \
   groupdel ubuntu 2>/dev/null || true; \
   groupadd --gid 1000 opencode \
   && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash opencode \
   && echo 'opencode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/opencode \
   && chmod 0440 /etc/sudoers.d/opencode \
-  && visudo -cf /etc/sudoers.d/opencode
+  && visudo -cf /etc/sudoers.d/opencode \
+  && find /var/log -type f -delete 2>/dev/null; \
+  rm -f /var/cache/debconf/*.dat 2>/dev/null || true
 
 # Entrypoint (tini + init script)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod 0755 /usr/local/bin/entrypoint.sh
 
 # ---------------------------------------------------------------------------
-# builder: fetch relocatable toolchains (layers are ephemeral —
-# only what's explicitly COPIED to final lands in the runtime image).
+# builder: runtime + compiler toolchain + relocatable toolchains —
+# only what's explicitly COPIED to final lands in the runtime image.
 # Order: most-stable first, so frequent version bumps don't bust the
 # cache of the other toolchains.
 # ---------------------------------------------------------------------------
-FROM base AS builder
+FROM runtime AS builder
 
-# 1. Homebrew — the install script URL is stable; brew releases rarely
-#    invalidate the layer once installed.
+# Compiler toolchain needed for building native extensions during
+# toolchain installation (Homebrew bottles, mise plugins, etc.).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential pkg-config xz-utils \
+  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
+
+# 1. Homebrew — partial clone with --filter=blob:none avoids downloading
+#    all past file versions, saving ~70 MB while keeping brew update working.
 RUN mkdir -p /home/linuxbrew \
   && chown opencode:opencode /home/linuxbrew \
-  && sudo -u opencode NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+  && sudo -u opencode git clone --filter=blob:none \
+    https://github.com/Homebrew/brew /home/linuxbrew/.linuxbrew/Homebrew \
+  && sudo -u opencode mkdir -p /home/linuxbrew/.linuxbrew/bin \
+  && sudo -u opencode ln -sf \
+    /home/linuxbrew/.linuxbrew/Homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew \
+  && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew update --force \
   && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew cleanup --prune=all \
   && sudo -u opencode rm -rf "$(sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew --cache)" \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test \
@@ -86,7 +99,7 @@ RUN curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash 
 # ---------------------------------------------------------------------------
 # final: runtime image — only the base layer plus copied-in toolchains
 # ---------------------------------------------------------------------------
-FROM base
+FROM runtime
 
 ARG OPENCODE_VERSION
 ARG IMAGE_CREATED
@@ -110,20 +123,22 @@ LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/spris
   io.artifacthub.package.maintainers='[{"name":"Gabriel Meola","email":"banter@gabe.mx"}]' \
   io.artifacthub.package.keywords="opencode,server,docker,ai,code,editor,development"
 
-# Runtimes copied from builder (most-stable first so frequent version
-# bumps don't invalidate cache for the other layers).
+# Copy layers
+# Ordered by most stable layers first so cache can be reused.
 COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
-COPY --from=builder /opt/opencode /usr/local/bin/opencode
+
+# Zerobrew — fast Homebrew alternative; mise zerobrew backend.
+COPY --from=builder /home/opencode/.local/bin/zb /usr/local/bin/zb
+COPY --from=builder /home/opencode/.local/bin/zbx /usr/local/bin/zbx
+COPY --from=builder --chown=opencode:opencode /home/opencode/.local/share/zerobrew /home/opencode/.local/share/zerobrew
 
 # Mise — dev tool manager; auto-installs tools defined in the global config.
 COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
 COPY --from=builder --chown=opencode:opencode /opt/mise /opt/mise
 COPY mise-config.toml /etc/mise/config.toml
 
-# Zerobrew — fast Homebrew alternative; mise zerobrew backend.
-COPY --from=builder /home/opencode/.local/bin/zb /usr/local/bin/zb
-COPY --from=builder /home/opencode/.local/bin/zbx /usr/local/bin/zbx
-COPY --from=builder --chown=opencode:opencode /home/opencode/.local/share/zerobrew /home/opencode/.local/share/zerobrew
+# Opencode
+COPY --from=builder /opt/opencode /usr/local/bin/opencode
 
 # Verify runtime and set up login-shell PATH and auto-install handler
 RUN opencode --version \

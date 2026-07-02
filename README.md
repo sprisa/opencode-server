@@ -14,12 +14,11 @@ A general-purpose Ubuntu Docker image for running [opencode](https://github.com/
 | **Base OS** | ubuntu:26.04 |
 | **User** | `opencode` (uid/gid 1000), passwordless sudo |
 | **opencode** | Pinned in `version.txt` as `OPENCODE_VERSION` build arg |
-| **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
-| **Python 3** | Lazy-installed via mise (see table below) |
+| **Lazy Installed Tools** | Node, Python3 (see below) |
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
 | **zerobrew** | Faster Homebrew alternative (`zb` on PATH) -- used as mise backend for lazy-installed tools |
 | **mise** | Dev tool manager — tools listed below install on first use via `zerobrew` backend |
-| **CLI utilities** | git, curl, jq, less, unzip, ssh client |
+| **CLI utilities** | git, curl, less, unzip |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
 
 ### Lazy-installed tools
@@ -29,6 +28,7 @@ These tools install on first use (via mise → github/zerobrew):
 | Tool | Command | Backend |
 |---|---|---|
 | GitHub CLI | `gh` | github |
+| jq | `jq` | github |
 | GitLab CLI | `glab` | zerobrew |
 | Ruby | `ruby` | zerobrew |
 | ripgrep | `rg` | github |
@@ -38,7 +38,7 @@ These tools install on first use (via mise → github/zerobrew):
 | Micro | `micro` | github |
 | Nano | `nano` | zerobrew |
 | Python 3 | `python3` | zerobrew |
-| Node.js | `node` | github |
+| Node.js | `node` | core |
 | Sapling | `sl` | github |
 
 The image ships with a system config at `/etc/mise/config.toml` with these pre-approved tools. Users can add or override tools by creating `~/.config/mise/config.toml` — mise merges both.
