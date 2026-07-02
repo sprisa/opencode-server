@@ -17,6 +17,7 @@ A general-purpose Ubuntu Docker image for running [opencode](https://github.com/
 | **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
 | **Python 3** | Lazy-installed via mise (see table below) |
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
+| **zerobrew** | Faster Homebrew alternative (`zb` on PATH) -- used as mise backend for lazy-installed tools |
 | **mise** | Dev tool manager — tools listed below install on first use via `zerobrew` backend |
 | **CLI utilities** | git, curl, jq, less, unzip, ssh client |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
@@ -109,4 +110,5 @@ Fetches the latest release from [anomalyco/opencode](https://github.com/anomalyc
 - `~/.local/bin` is on PATH and user-writable, useful for dropping custom tools at runtime.
 - Node version can be switched at runtime with `n <version>` (e.g. `n lts`).
 - Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume). It uses its bundled portable Ruby — no system Ruby needed.
+- Zerobrew (`zb`) is installed at `/usr/local/bin/zb` with its prefix at `~/.local/share/zerobrew/prefix` on PATH for accessing formula binaries.
 - **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via zerobrew on first use. The image ships defaults in `/etc/mise/config.toml`; create `~/.config/mise/config.toml` to add your own — mise merges both.
