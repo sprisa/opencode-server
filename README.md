@@ -20,6 +20,7 @@ A general-purpose Ubuntu Docker image for running [opencode](https://github.com/
 | **zerobrew** | Faster Homebrew alternative (`zb` on PATH) -- used as mise backend for lazy-installed tools |
 | **mise** | Dev tool manager — tools listed below install on first use via `zerobrew` backend |
 | **CLI utilities** | git, curl, jq, less, unzip, ssh client |
+| **Sapling** | Prebuilt `sl` binary from Facebook Releases at `/opt/sapling` |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
 
 ### Lazy-installed tools
@@ -39,7 +40,6 @@ These tools install on first use (via mise → zerobrew):
 | Nano | `nano` | zerobrew |
 | Python 3 | `python3` | zerobrew |
 | Node.js | `node` | zerobrew |
-| Sapling | `sl` | zerobrew |
 
 The image ships with a system config at `/etc/mise/config.toml` with these pre-approved tools. Users can add or override tools by creating `~/.config/mise/config.toml` — mise merges both.
 
@@ -112,4 +112,5 @@ Fetches the latest release from [anomalyco/opencode](https://github.com/anomalyc
 - Node version can be switched at runtime with `n <version>` (e.g. `n lts`).
 - Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume). It uses its bundled portable Ruby — no system Ruby needed.
 - Zerobrew (`zb`) is installed at `/usr/local/bin/zb` with its prefix at `~/.local/share/zerobrew/prefix` on PATH for accessing formula binaries.
+- Sapling (`sl`) is installed at `/opt/sapling` from the official Facebook prebuilt release.
 - **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via zerobrew on first use. The image ships defaults in `/etc/mise/config.toml`; create `~/.config/mise/config.toml` to add your own — mise merges both.
