@@ -27,15 +27,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   less libatomic1 sudo tini tzdata \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
   && rm -rf /usr/share/doc /usr/share/man /usr/share/locale \
-  && find /var/log -type f -delete 2>/dev/null; \
-  rm -f /var/cache/debconf/*.dat 2>/dev/null || true \
   && userdel --remove ubuntu 2>/dev/null || true; \
   groupdel ubuntu 2>/dev/null || true; \
   groupadd --gid 1000 opencode \
   && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash opencode \
   && echo 'opencode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/opencode \
   && chmod 0440 /etc/sudoers.d/opencode \
-  && visudo -cf /etc/sudoers.d/opencode
+  && visudo -cf /etc/sudoers.d/opencode \
+  && find /var/log -type f -delete 2>/dev/null; \
+  rm -f /var/cache/debconf/*.dat 2>/dev/null || true
 
 # Entrypoint (tini + init script)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
