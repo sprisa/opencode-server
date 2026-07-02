@@ -125,19 +125,19 @@ LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/spris
 
 # Copy layers
 # Ordered by most stable layers first so cache can be reused.
-
-# Mise — dev tool manager; auto-installs tools defined in the global config.
-COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
-COPY --from=builder --chown=opencode:opencode /opt/mise /opt/mise
-COPY mise-config.toml /etc/mise/config.toml
+COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
 
 # Zerobrew — fast Homebrew alternative; mise zerobrew backend.
 COPY --from=builder /home/opencode/.local/bin/zb /usr/local/bin/zb
 COPY --from=builder /home/opencode/.local/bin/zbx /usr/local/bin/zbx
 COPY --from=builder --chown=opencode:opencode /home/opencode/.local/share/zerobrew /home/opencode/.local/share/zerobrew
 
+# Mise — dev tool manager; auto-installs tools defined in the global config.
+COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
+COPY --from=builder --chown=opencode:opencode /opt/mise /opt/mise
+COPY mise-config.toml /etc/mise/config.toml
+
 # Opencode
-COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
 COPY --from=builder /opt/opencode /usr/local/bin/opencode
 
 # Verify runtime and set up login-shell PATH and auto-install handler
