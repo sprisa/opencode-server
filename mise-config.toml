@@ -1,5 +1,6 @@
 [tools]
 "github:cli/cli" = "latest"          # shim:gh
+"github:jqlang/jq" = "latest"
 "zerobrew:glab" = "latest"
 "zerobrew:ruby" = "latest"
 "github:BurntSushi/ripgrep" = "latest"  # shim:rg

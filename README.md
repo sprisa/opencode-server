@@ -19,7 +19,7 @@ A general-purpose Ubuntu Docker image for running [opencode](https://github.com/
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
 | **zerobrew** | Faster Homebrew alternative (`zb` on PATH) -- used as mise backend for lazy-installed tools |
 | **mise** | Dev tool manager — tools listed below install on first use via `zerobrew` backend |
-| **CLI utilities** | git, curl, jq, less, unzip, ssh client |
+| **CLI utilities** | git, curl, less, unzip, ssh client |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
 
 ### Lazy-installed tools
@@ -29,6 +29,7 @@ These tools install on first use (via mise → github/zerobrew):
 | Tool | Command | Backend |
 |---|---|---|
 | GitHub CLI | `gh` | github |
+| jq | `jq` | github |
 | GitLab CLI | `glab` | zerobrew |
 | Ruby | `ruby` | zerobrew |
 | ripgrep | `rg` | github |
