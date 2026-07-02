@@ -23,7 +23,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # CLI utilities for day-to-day dev work (git, curl, etc.).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  ca-certificates curl git openssh-client unzip \
+  ca-certificates curl git unzip \
   less libatomic1 sudo tini tzdata \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
   && rm -rf /usr/share/doc /usr/share/man /usr/share/locale \
