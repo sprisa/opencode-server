@@ -7,25 +7,24 @@
 # lives under ~/workspace.
 #
 # Three-stage build:
-#   base     — apt packages, user, sudo, init — shared by builder and final
-#   builder  — fetches relocatable toolchains (opencode, Homebrew, mise)
-#   final    — copies in runtimes from builder; carries only runtime layers
+#   runtime   — minimal apt packages, user, sudo, init
+#   builder   — runtime + compiler toolchain + relocatable toolchains (opencode, Homebrew, mise)
+#   final     — copies in runtimes from builder; carries only runtime layers
 
 ARG OPENCODE_VERSION=0.0.0
 ARG IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
 # ---------------------------------------------------------------------------
-# base: common runtime layer (apt, user, sudo, init)
+# runtime: minimal runtime layer (apt, user, sudo, init)
 # ---------------------------------------------------------------------------
-FROM ubuntu:26.04 AS base
+FROM ubuntu:26.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# General dev toolchain: VCS, build tools, languages, CLI utilities.
+# CLI utilities for day-to-day dev work (git, curl, etc.).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  ca-certificates curl git openssh-client unzip xz-utils \
-  build-essential jq pkg-config \
-  less sudo tini tzdata locales \
+  ca-certificates curl git openssh-client unzip \
+  jq less sudo tini tzdata locales \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
   && userdel --remove ubuntu 2>/dev/null || true; \
   groupdel ubuntu 2>/dev/null || true; \
@@ -40,12 +39,18 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod 0755 /usr/local/bin/entrypoint.sh
 
 # ---------------------------------------------------------------------------
-# builder: fetch relocatable toolchains (layers are ephemeral —
-# only what's explicitly COPIED to final lands in the runtime image).
+# builder: runtime + compiler toolchain + relocatable toolchains —
+# only what's explicitly COPIED to final lands in the runtime image.
 # Order: most-stable first, so frequent version bumps don't bust the
 # cache of the other toolchains.
 # ---------------------------------------------------------------------------
-FROM base AS builder
+FROM runtime AS builder
+
+# Compiler toolchain needed for building native extensions during
+# toolchain installation (Homebrew bottles, mise plugins, etc.).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential pkg-config xz-utils \
+  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
 # 1. Homebrew — the install script URL is stable; brew releases rarely
 #    invalidate the layer once installed.
@@ -86,7 +91,7 @@ RUN curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash 
 # ---------------------------------------------------------------------------
 # final: runtime image — only the base layer plus copied-in toolchains
 # ---------------------------------------------------------------------------
-FROM base
+FROM runtime
 
 ARG OPENCODE_VERSION
 ARG IMAGE_CREATED

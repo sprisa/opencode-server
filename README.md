@@ -14,7 +14,7 @@ A general-purpose Ubuntu Docker image for running [opencode](https://github.com/
 | **Base OS** | ubuntu:26.04 |
 | **User** | `opencode` (uid/gid 1000), passwordless sudo |
 | **opencode** | Pinned in `version.txt` as `OPENCODE_VERSION` build arg |
-| **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
+| **Build tools** | Not included in runtime — `sudo apt install build-essential` if needed for native addons |
 | **Python 3** | Lazy-installed via mise (see table below) |
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
 | **zerobrew** | Faster Homebrew alternative (`zb` on PATH) -- used as mise backend for lazy-installed tools |
