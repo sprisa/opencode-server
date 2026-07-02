@@ -10,5 +10,5 @@
 "github:zyedidia/micro" = "latest"
 "zerobrew:nano" = "latest"
 "zerobrew:python" = "latest"
-"github:nodejs/node" = "latest"
+"node" = "latest"
 "github:facebook/sapling" = "latest"    # shim:sl
