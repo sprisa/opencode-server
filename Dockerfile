@@ -115,10 +115,8 @@ LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/spris
   io.artifacthub.package.maintainers='[{"name":"Gabriel Meola","email":"banter@gabe.mx"}]' \
   io.artifacthub.package.keywords="opencode,server,docker,ai,code,editor,development"
 
-# Runtimes copied from builder (most-stable first so frequent version
-# bumps don't invalidate cache for the other layers).
-COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
-COPY --from=builder /opt/opencode /usr/local/bin/opencode
+# Copy layers
+# Ordered by most stable layers first so cache can be reused.
 
 # Mise — dev tool manager; auto-installs tools defined in the global config.
 COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
@@ -129,6 +127,10 @@ COPY mise-config.toml /etc/mise/config.toml
 COPY --from=builder /home/opencode/.local/bin/zb /usr/local/bin/zb
 COPY --from=builder /home/opencode/.local/bin/zbx /usr/local/bin/zbx
 COPY --from=builder --chown=opencode:opencode /home/opencode/.local/share/zerobrew /home/opencode/.local/share/zerobrew
+
+# Opencode
+COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
+COPY --from=builder /opt/opencode /usr/local/bin/opencode
 
 # Verify runtime and set up login-shell PATH and auto-install handler
 RUN opencode --version \
