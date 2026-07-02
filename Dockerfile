@@ -66,7 +66,8 @@ RUN mkdir -p /home/linuxbrew \
 #     auto-install via zerobrew backend on first use at runtime.
 RUN curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh \
   && mkdir -p /opt/mise \
-  && MISE_DATA_DIR=/opt/mise mise plugins install zerobrew https://github.com/kennyg/mise-zerobrew
+  && MISE_DATA_DIR=/opt/mise mise plugins install zerobrew https://github.com/kennyg/mise-zerobrew \
+  && sed -i '/quoted_path .. " install /i\    cmd.exec(quoted_zb .. " --root " .. quoted_path .. " init")' /opt/mise/plugins/zerobrew/hooks/backend_install.lua
 
 # 1.6. zerobrew — fast Homebrew alternative; used as mise backend
 RUN sudo -u opencode HOME=/home/opencode NONINTERACTIVE=1 /bin/bash -c " \
