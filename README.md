@@ -28,17 +28,17 @@ These tools install on first use (via mise → github/zerobrew):
 
 | Tool | Command | Backend |
 |---|---|---|
-| GitHub CLI | `gh` | zerobrew |
+| GitHub CLI | `gh` | github |
 | GitLab CLI | `glab` | zerobrew |
 | Ruby | `ruby` | zerobrew |
-| ripgrep | `rg` | zerobrew |
-| fd | `fd` | zerobrew |
+| ripgrep | `rg` | github |
+| fd | `fd` | github |
 | Wget | `wget` | zerobrew |
 | Vim | `vim` | zerobrew |
-| Micro | `micro` | zerobrew |
+| Micro | `micro` | github |
 | Nano | `nano` | zerobrew |
 | Python 3 | `python3` | zerobrew |
-| Node.js | `node` | zerobrew |
+| Node.js | `node` | github |
 | Sapling | `sl` | github |
 
 The image ships with a system config at `/etc/mise/config.toml` with these pre-approved tools. Users can add or override tools by creating `~/.config/mise/config.toml` — mise merges both.
