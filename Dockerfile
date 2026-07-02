@@ -63,10 +63,15 @@ RUN mkdir -p /home/linuxbrew \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/homebrew/homebrew-core
 
 # 1.5. mise — dev tool manager; pre-approved tools defined in the global config
-#     auto-install via Homebrew backend on first use at runtime.
+#     auto-install via zerobrew backend on first use at runtime.
 RUN curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh \
   && mkdir -p /opt/mise \
-  && MISE_DATA_DIR=/opt/mise mise plugins install brew https://github.com/woutermont/mise-brew
+  && MISE_DATA_DIR=/opt/mise mise plugins install zerobrew https://github.com/kennyg/mise-zerobrew
+
+# 1.6. zerobrew — fast Homebrew alternative; used as mise backend
+RUN sudo -u opencode HOME=/home/opencode NONINTERACTIVE=1 /bin/bash -c " \
+  curl -fsSL https://zerobrew.rs/install | bash -s -- --no-modify-path \
+"
 
 ARG OPENCODE_VERSION
 
@@ -85,7 +90,7 @@ FROM base
 ARG OPENCODE_VERSION
 ARG IMAGE_CREATED
 
-ENV PATH=/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/opt/auto-install-shims:${PATH}
+ENV PATH=/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/opencode/.local/share/zerobrew/prefix/bin:/opt/auto-install-shims:${PATH}
 ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
@@ -114,9 +119,14 @@ COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
 COPY --from=builder --chown=opencode:opencode /opt/mise /opt/mise
 COPY mise-config.toml /etc/mise/config.toml
 
+# Zerobrew — fast Homebrew alternative; mise zerobrew backend.
+COPY --from=builder /home/opencode/.local/bin/zb /usr/local/bin/zb
+COPY --from=builder /home/opencode/.local/bin/zbx /usr/local/bin/zbx
+COPY --from=builder --chown=opencode:opencode /home/opencode/.local/share/zerobrew /home/opencode/.local/share/zerobrew
+
 # Verify runtime and set up login-shell PATH and auto-install handler
 RUN opencode --version \
-  && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
+  && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin" "$HOME/.local/share/zerobrew/prefix/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
   && chmod 0644 /etc/profile.d/brew-path.sh \
   && printf '\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
   && printf '\neval "$(mise activate zsh)"\n' >> /home/opencode/.zshrc \

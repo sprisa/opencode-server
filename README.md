@@ -17,27 +17,27 @@ A general-purpose Ubuntu Docker image for running [opencode](https://github.com/
 | **Build tools** | `build-essential`, `pkg-config` (for native npm addons, pip source builds) |
 | **Python 3** | Lazy-installed via mise (see table below) |
 | **Homebrew** | Linux-native Homebrew (`/home/linuxbrew/.linuxbrew`) — `brew` on PATH |
-| **mise** | Dev tool manager — tools listed below install on first use via `brew` backend |
+| **mise** | Dev tool manager — tools listed below install on first use via `zerobrew` backend |
 | **CLI utilities** | git, curl, jq, less, unzip, ssh client |
 | **Init** | tini as PID 1 (zombie reaping, clean shutdown) |
 
 ### Lazy-installed tools
 
-These tools install on first use (via mise → Homebrew):
+These tools install on first use (via mise → zerobrew):
 
 | Tool | Command | Backend |
 |---|---|---|
-| GitHub CLI | `gh` | brew |
-| GitLab CLI | `glab` | brew |
-| Ruby | `ruby` | brew |
-| ripgrep | `rg` | brew |
-| fd | `fd` | brew |
-| Wget | `wget` | brew |
-| Vim | `vim` | brew |
-| Micro | `micro` | brew |
-| Nano | `nano` | brew |
-| Python 3 | `python3` | brew |
-| Node.js | `node` | brew |
+| GitHub CLI | `gh` | zerobrew |
+| GitLab CLI | `glab` | zerobrew |
+| Ruby | `ruby` | zerobrew |
+| ripgrep | `rg` | zerobrew |
+| fd | `fd` | zerobrew |
+| Wget | `wget` | zerobrew |
+| Vim | `vim` | zerobrew |
+| Micro | `micro` | zerobrew |
+| Nano | `nano` | zerobrew |
+| Python 3 | `python3` | zerobrew |
+| Node.js | `node` | zerobrew |
 
 The image ships with a system config at `/etc/mise/config.toml` with these pre-approved tools. Users can add or override tools by creating `~/.config/mise/config.toml` — mise merges both.
 
@@ -109,4 +109,4 @@ Fetches the latest release from [anomalyco/opencode](https://github.com/anomalyc
 - `~/.local/bin` is on PATH and user-writable, useful for dropping custom tools at runtime.
 - Node version can be switched at runtime with `n <version>` (e.g. `n lts`).
 - Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume). It uses its bundled portable Ruby — no system Ruby needed.
-- **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via Homebrew on first use. The image ships defaults in `/etc/mise/config.toml`; create `~/.config/mise/config.toml` to add your own — mise merges both.
+- **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via zerobrew on first use. The image ships defaults in `/etc/mise/config.toml`; create `~/.config/mise/config.toml` to add your own — mise merges both.
