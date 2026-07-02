@@ -74,13 +74,6 @@ RUN sudo -u opencode HOME=/home/opencode NONINTERACTIVE=1 /bin/bash -c " \
   curl -fsSL https://zerobrew.rs/install | bash -s -- --no-modify-path \
 "
 
-# 1.7. sapling (sl) — prebuilt binary (zerobrew bottle has broken Python stdlib)
-RUN arch="$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')" \
-  && version="0.2.20260522-084851+1e764c94" \
-  && mkdir -p /opt/sapling \
-  && curl -fsSL "https://github.com/facebook/sapling/releases/download/${version}/sapling-${version}-linux-${arch}.tar.xz" \
-  | tar xJf - -C /opt/sapling --strip-components=1
-
 ARG OPENCODE_VERSION
 
 # 2. opencode server binary — changes on every version bump (most frequent)
@@ -98,7 +91,7 @@ FROM base
 ARG OPENCODE_VERSION
 ARG IMAGE_CREATED
 
-ENV PATH=/opt/sapling:/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/opencode/.local/share/zerobrew/prefix/bin:/opt/auto-install-shims:${PATH}
+ENV PATH=/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/opencode/.local/share/zerobrew/prefix/bin:/opt/auto-install-shims:${PATH}
 ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
@@ -132,12 +125,9 @@ COPY --from=builder /home/opencode/.local/bin/zb /usr/local/bin/zb
 COPY --from=builder /home/opencode/.local/bin/zbx /usr/local/bin/zbx
 COPY --from=builder --chown=opencode:opencode /home/opencode/.local/share/zerobrew /home/opencode/.local/share/zerobrew
 
-# Sapling (sl) — prebuilt binary from Facebook Releases.
-COPY --from=builder /opt/sapling /opt/sapling
-
 # Verify runtime and set up login-shell PATH and auto-install handler
 RUN opencode --version \
-  && printf 'for d in "/opt/sapling" "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin" "$HOME/.local/share/zerobrew/prefix/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
+  && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin" "$HOME/.local/share/zerobrew/prefix/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
   && chmod 0644 /etc/profile.d/brew-path.sh \
   && printf '\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
   && printf '\neval "$(mise activate zsh)"\n' >> /home/opencode/.zshrc \

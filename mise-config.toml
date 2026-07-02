@@ -10,3 +10,4 @@
 "zerobrew:nano" = "latest"
 "zerobrew:python" = "latest"
 "zerobrew:node" = "latest"
+"github:facebook/sapling" = "latest"
