@@ -35,6 +35,8 @@ jobs:
 
       - name: Run runtime tests
         id: tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -e
           PASS=0
@@ -55,7 +57,7 @@ jobs:
             fi
           }
 
-          IN="docker run --rm --entrypoint bash opencode-test:latest"
+          IN="docker run --rm -e GITHUB_TOKEN --entrypoint bash opencode-test:latest"
 
           echo "=== Pre-installed tools (interactive) ==="
 
