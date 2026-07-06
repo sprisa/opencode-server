@@ -6,7 +6,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   test:
@@ -42,10 +41,10 @@ jobs:
           PASS=0
           FAIL=0
           REPORT=""
-          RESULTS=""
 
           test() {
             local desc="$1" cmd="$2"
+            echo "::group::${desc}"
             if eval "$cmd" 2>&1; then
               PASS=$((PASS+1))
               REPORT="${REPORT}- [x] ${desc}\n"
@@ -55,6 +54,7 @@ jobs:
               REPORT="${REPORT}- [ ] ${desc}\n"
               echo "FAIL: ${desc}"
             fi
+            echo "::endgroup::"
           }
 
           IN="docker run --rm -e GITHUB_TOKEN --entrypoint bash opencode-test:latest"
@@ -108,37 +108,21 @@ jobs:
           echo ""
           echo "=== Results: $PASS passed, $FAIL failed ==="
 
-          RESULTS="**${PASS} passed, ${FAIL} failed**\n\n${REPORT}"
-          RESULTS="${RESULTS}\n### Shorthand\n\n| Scope | Interactive | Non-interactive |\n|---|---|---|"
-          RESULTS="${RESULTS}\n| Pre-installed tools | \`node --version\`, \`npm --version\`, \`npx --version\`, \`gh --version\` | \`which node\`, \`which npm\`, \`which npx\` |"
-          RESULTS="${RESULTS}\n| mise use | \`mise use go && go version\` | \`mise use go && go version\` |"
-
-          # Write multi-line output properly
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "results<<$EOF" >> "$GITHUB_OUTPUT"
-          printf "%b" "$RESULTS" >> "$GITHUB_OUTPUT"
-          echo "$EOF" >> "$GITHUB_OUTPUT"
+          # Write to step summary
+          {
+            echo "## Runtime test results"
+            echo ""
+            echo "**${PASS} passed, ${FAIL} failed**"
+            echo ""
+            printf "%b" "$REPORT"
+            echo ""
+            echo "### Shorthand"
+            echo ""
+            echo "| Scope | Interactive | Non-interactive |"
+            echo "|---|---|---|"
+            echo "| Pre-installed tools | \`node --version\`, \`npm --version\`, \`npx --version\`, \`gh --version\` | \`which node\`, \`which npm\`, \`which npx\` |"
+            echo "| mise use | \`mise use go && go version\` | \`mise use go && go version\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           # Fail the step if any test failed
           [ "$FAIL" -eq 0 ]
-
-      - name: Comment results on PR
-        if: github.event_name == 'pull_request' && always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          BODY=$(cat <<EOF
-          ## Runtime test results
-
-          ${{ steps.tests.outputs.results }}
-
-          ---
-          *Triggered by \`${{ github.sha }}\`*
-          EOF
-          )
-          gh pr comment "${{ github.event.number }}" \
-            --repo "${{ github.repository }}" \
-            --body "$BODY" --edit-last 2>/dev/null \
-          || gh pr comment "${{ github.event.number }}" \
-            --repo "${{ github.repository }}" \
-            --body "$BODY"
