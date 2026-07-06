@@ -152,20 +152,18 @@ RUN opencode --version \
   && mkdir -p /opt/auto-install-shims \
   && grep -E '^\s*"' /etc/mise/config.toml | while IFS='=' read -r key value; do \
   key="$(echo "$key" | tr -d ' "')" \
-  && shim="$(echo "$value" | sed -n 's/.*# shim:\([^ ]*\).*/\1/p')" \
-  && if [ -z "$shim" ]; then \
+  && shim_list="$(echo "$value" | sed -n 's/.*# shim:\([^ ]*\).*/\1/p')" \
+  && if [ -z "$shim_list" ]; then \
      case "$key" in \
-       github:*) shim="${key##*/}" ;; \
-       *) shim="${key#*:}" ;; \
+       github:*) shim_list="${key##*/}" ;; \
+       *) shim_list="${key#*:}" ;; \
      esac; \
      fi \
-  && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "%s" -- %s "$@"\n' "$key" "$shim" > "/opt/auto-install-shims/$shim" \
-  && chmod 0755 "/opt/auto-install-shims/$shim"; \
+  && for shim in $(echo "$shim_list" | tr ',' ' '); do \
+     printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "%s" -- %s "$@"\n' "$key" "$shim" > "/opt/auto-install-shims/$shim" \
+     && chmod 0755 "/opt/auto-install-shims/$shim"; \
+     done; \
   done \
-  && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "node" -- npm "$@"\n' > /opt/auto-install-shims/npm \
-  && chmod 0755 /opt/auto-install-shims/npm \
-  && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "node" -- npx "$@"\n' > /opt/auto-install-shims/npx \
-  && chmod 0755 /opt/auto-install-shims/npx \
   && chown -R opencode:opencode /opt/auto-install-shims \
   && mkdir -p /home/opencode/workspace \
   && chown -R opencode:opencode /home/opencode
