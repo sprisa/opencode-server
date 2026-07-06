@@ -113,3 +113,8 @@ Fetches the latest release from [anomalyco/opencode](https://github.com/anomalyc
 - Homebrew is installed under `/home/linuxbrew/.linuxbrew` (outside the persistent volume). It uses its bundled portable Ruby — no system Ruby needed.
 - Zerobrew (`zb`) is installed at `/usr/local/bin/zb` with its prefix at `~/.local/share/zerobrew/prefix` on PATH for accessing formula binaries.
 - **Lazy-installed tools** (see table above): run any listed tool and mise auto-installs it via zerobrew or github backend on first use. The image ships defaults in `/etc/mise/config.toml`; create `~/.config/mise/config.toml` to add your own — mise merges both.
+
+
+---
+
+Use in production at www.codeplace.app
