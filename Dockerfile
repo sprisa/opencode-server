@@ -23,7 +23,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # CLI utilities for day-to-day dev work (git, curl, etc.).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  ca-certificates curl git unzip \
+  ca-certificates curl git openssh-client unzip \
   less libatomic1 sudo tini tzdata \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
   && rm -rf /usr/share/doc /usr/share/man /usr/share/locale \
@@ -162,6 +162,10 @@ RUN opencode --version \
   && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "%s" -- %s "$@"\n' "$key" "$shim" > "/opt/auto-install-shims/$shim" \
   && chmod 0755 "/opt/auto-install-shims/$shim"; \
   done \
+  && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "node" -- npm "$@"\n' > /opt/auto-install-shims/npm \
+  && chmod 0755 /opt/auto-install-shims/npm \
+  && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "node" -- npx "$@"\n' > /opt/auto-install-shims/npx \
+  && chmod 0755 /opt/auto-install-shims/npx \
   && chown -R opencode:opencode /opt/auto-install-shims \
   && mkdir -p /home/opencode/workspace \
   && chown -R opencode:opencode /home/opencode
