@@ -109,6 +109,7 @@ ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
 ENV MISE_ALWAYS_INSTALL=1
+ENV BASH_ENV=/etc/opencode-mise.bash
 
 LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/sprisa/opencode-server/refs/heads/main/README.md" \
   org.opencontainers.image.created="${IMAGE_CREATED}" \
@@ -144,11 +145,13 @@ COPY --from=builder /opt/opencode /usr/local/bin/opencode
 RUN opencode --version \
   && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin" "$HOME/.local/share/zerobrew/prefix/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
   && chmod 0644 /etc/profile.d/brew-path.sh \
-  && printf '\nmise reshim 2>/dev/null # recreate shims for all configs (system + user)\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
+  && printf '\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
   && printf '\neval "$(mise activate zsh)"\n' >> /home/opencode/.zshrc \
   && mkdir -p /home/opencode/.config/fish \
   && printf '\nmise activate fish | source\n' >> /home/opencode/.config/fish/config.fish \
   && printf '\neval "$(mise activate sh)"\n' >> /home/opencode/.profile \
+  && printf '#!/usr/bin/env bash\n# Lightweight fallback for user-added mise tools\nif [ -n "${BASH_VERSION-}" ]; then\n  command_not_found_handle() {\n    if /usr/local/bin/mise which "$1" &>/dev/null; then\n      /usr/local/bin/mise exec "$1" -- "$@"\n      return $?\n    fi\n    return 127\n  }\nfi\n' > /etc/opencode-mise.bash \
+  && chmod 0644 /etc/opencode-mise.bash \
   && mkdir -p /opt/auto-install-shims \
   && grep -E '^\s*"' /etc/mise/config.toml | while IFS='=' read -r key value; do \
   key="$(echo "$key" | tr -d ' "')" \
