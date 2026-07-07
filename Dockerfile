@@ -144,7 +144,7 @@ COPY --from=builder /opt/opencode /usr/local/bin/opencode
 RUN opencode --version \
   && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin" "$HOME/.local/share/zerobrew/prefix/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
   && chmod 0644 /etc/profile.d/brew-path.sh \
-  && printf '\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
+  && printf '\nmise reshim 2>/dev/null # recreate shims for all configs (system + user)\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
   && printf '\neval "$(mise activate zsh)"\n' >> /home/opencode/.zshrc \
   && mkdir -p /home/opencode/.config/fish \
   && printf '\nmise activate fish | source\n' >> /home/opencode/.config/fish/config.fish \
