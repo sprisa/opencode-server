@@ -169,8 +169,7 @@ RUN opencode --version \
   done \
   && chown -R opencode:opencode /opt/auto-install-shims \
   && mkdir -p /opt/mise/shims \
-  && mise reshim \
-  && chown -R opencode:opencode /opt/mise/shims \
+  && chown opencode:opencode /opt/mise/shims \
   && mkdir -p /home/opencode/workspace \
   && chown -R opencode:opencode /home/opencode
 
