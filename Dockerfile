@@ -104,7 +104,7 @@ FROM runtime
 ARG OPENCODE_VERSION
 ARG IMAGE_CREATED
 
-ENV PATH=/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/opencode/.local/share/zerobrew/prefix/bin:/opt/auto-install-shims:${PATH}
+ENV PATH=/opt/mise/shims:/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/opencode/.local/share/zerobrew/prefix/bin:/opt/auto-install-shims:${PATH}
 ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
@@ -168,6 +168,9 @@ RUN opencode --version \
      done; \
   done \
   && chown -R opencode:opencode /opt/auto-install-shims \
+  && mkdir -p /opt/mise/shims \
+  && mise reshim \
+  && chown -R opencode:opencode /opt/mise/shims \
   && mkdir -p /home/opencode/workspace \
   && chown -R opencode:opencode /home/opencode
 
