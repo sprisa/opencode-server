@@ -11,4 +11,5 @@
 "zerobrew:nano" = "latest"
 "zerobrew:python" = "latest"
 "node" = "latest"
+"npm" = "latest"              # shim:npm,npx
 "github:facebook/sapling" = "latest"    # shim:sl

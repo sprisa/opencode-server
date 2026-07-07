@@ -1,0 +1,128 @@
+name: PR test
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Runtime behavior tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(cat version.txt | tr -d '[:space:]')
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          build-args: OPENCODE_VERSION=${{ steps.version.outputs.version }}
+          tags: opencode-test:latest
+
+      - name: Run runtime tests
+        id: tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          PASS=0
+          FAIL=0
+          REPORT=""
+
+          test() {
+            local desc="$1" cmd="$2"
+            echo "::group::${desc}"
+            if eval "$cmd" 2>&1; then
+              PASS=$((PASS+1))
+              REPORT="${REPORT}- [x] ${desc}\n"
+              echo "PASS: ${desc}"
+            else
+              FAIL=$((FAIL+1))
+              REPORT="${REPORT}- [ ] ${desc}\n"
+              echo "FAIL: ${desc}"
+            fi
+            echo "::endgroup::"
+          }
+
+          IN="docker run --rm -e GITHUB_TOKEN --entrypoint bash opencode-test:latest"
+
+          echo "=== Pre-installed tools (interactive) ==="
+
+          test "node works in interactive shell" \
+            "$IN -i -c 'source ~/.bashrc 2>/dev/null; node --version'"
+
+          test "npm works in interactive shell" \
+            "$IN -i -c 'source ~/.bashrc 2>/dev/null; npm --version'"
+
+          test "npx works in interactive shell" \
+            "$IN -i -c 'source ~/.bashrc 2>/dev/null; npx --version'"
+
+          test "gh works in interactive shell" \
+            "$IN -i -c 'source ~/.bashrc 2>/dev/null; gh --version'"
+
+          echo "=== mise use (interactive) ==="
+
+          test "mise use go works in interactive shell" \
+            "$IN -i -c 'source ~/.bashrc 2>/dev/null; mise use go@latest && go version'"
+
+          echo "=== Pre-installed tools (non-interactive, via BASH_ENV) ==="
+
+          test "node works in non-interactive shell" \
+            "$IN -c 'which node && node --version'"
+
+          test "npm works in non-interactive shell" \
+            "$IN -c 'which npm && npm --version'"
+
+          test "npx works in non-interactive shell" \
+            "$IN -c 'which npx && npx --version'"
+
+          echo "=== mise use (non-interactive, via BASH_ENV fallback) ==="
+
+          test "mise use go works in non-interactive shell" \
+            "$IN -c 'mise use go@latest && go version'"
+
+          echo "=== Shim path verification (non-interactive) ==="
+
+          test "node resolves from auto-install-shims" \
+            "$IN -c 'which node | grep -q /opt/auto-install-shims/node'"
+
+          test "npm resolves from auto-install-shims" \
+            "$IN -c 'which npm | grep -q /opt/auto-install-shims/npm'"
+
+          test "npx resolves from auto-install-shims" \
+            "$IN -c 'which npx | grep -q /opt/auto-install-shims/npx'"
+
+          echo ""
+          echo "=== Results: $PASS passed, $FAIL failed ==="
+
+          # Write to step summary
+          {
+            echo "## Runtime test results"
+            echo ""
+            echo "**${PASS} passed, ${FAIL} failed**"
+            echo ""
+            printf "%b" "$REPORT"
+            echo ""
+            echo "### Shorthand"
+            echo ""
+            echo "| Scope | Interactive | Non-interactive |"
+            echo "|---|---|---|"
+            echo "| Pre-installed tools | \`node --version\`, \`npm --version\`, \`npx --version\`, \`gh --version\` | \`which node\`, \`which npm\`, \`which npx\` |"
+            echo "| mise use | \`mise use go && go version\` | \`mise use go && go version\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Fail the step if any test failed
+          [ "$FAIL" -eq 0 ]

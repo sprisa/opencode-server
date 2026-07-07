@@ -23,7 +23,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # CLI utilities for day-to-day dev work (git, curl, etc.).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  ca-certificates curl git unzip \
+  ca-certificates curl git openssh-client unzip \
   less libatomic1 sudo tini tzdata \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
   && rm -rf /usr/share/doc /usr/share/man /usr/share/locale \
@@ -109,6 +109,7 @@ ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
 ENV MISE_ALWAYS_INSTALL=1
+ENV BASH_ENV=/etc/opencode-mise.bash
 
 LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/sprisa/opencode-server/refs/heads/main/README.md" \
   org.opencontainers.image.created="${IMAGE_CREATED}" \
@@ -144,23 +145,27 @@ COPY --from=builder /opt/opencode /usr/local/bin/opencode
 RUN opencode --version \
   && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin" "$HOME/.local/share/zerobrew/prefix/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
   && chmod 0644 /etc/profile.d/brew-path.sh \
-  && printf '\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
+  && printf '\n# Mise activation for interactive shells\nsource /etc/opencode-mise.bash\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \
   && printf '\neval "$(mise activate zsh)"\n' >> /home/opencode/.zshrc \
   && mkdir -p /home/opencode/.config/fish \
   && printf '\nmise activate fish | source\n' >> /home/opencode/.config/fish/config.fish \
   && printf '\neval "$(mise activate sh)"\n' >> /home/opencode/.profile \
+  && printf '#!/usr/bin/env bash\n# Route unknown commands through mise (fallback for non-interactive shells)\nif [ -n "${BASH_VERSION-}" ]; then\n  command_not_found_handle() {\n    if /usr/local/bin/mise which "$1" &>/dev/null; then\n      /usr/local/bin/mise exec "$1" -- "$@"\n      return $?\n    fi\n    return 127\n  }\nfi\n' > /etc/opencode-mise.bash \
+  && chmod 0644 /etc/opencode-mise.bash \
   && mkdir -p /opt/auto-install-shims \
   && grep -E '^\s*"' /etc/mise/config.toml | while IFS='=' read -r key value; do \
   key="$(echo "$key" | tr -d ' "')" \
-  && shim="$(echo "$value" | sed -n 's/.*# shim:\([^ ]*\).*/\1/p')" \
-  && if [ -z "$shim" ]; then \
+  && shim_list="$(echo "$value" | sed -n 's/.*# shim:\([^ ]*\).*/\1/p')" \
+  && if [ -z "$shim_list" ]; then \
      case "$key" in \
-       github:*) shim="${key##*/}" ;; \
-       *) shim="${key#*:}" ;; \
+       github:*) shim_list="${key##*/}" ;; \
+       *) shim_list="${key#*:}" ;; \
      esac; \
      fi \
-  && printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "%s" -- %s "$@"\n' "$key" "$shim" > "/opt/auto-install-shims/$shim" \
-  && chmod 0755 "/opt/auto-install-shims/$shim"; \
+  && for shim in $(echo "$shim_list" | tr ',' ' '); do \
+     printf '#!/usr/bin/env bash\nexec /usr/local/bin/mise exec "%s" -- %s "$@"\n' "$key" "$shim" > "/opt/auto-install-shims/$shim" \
+     && chmod 0755 "/opt/auto-install-shims/$shim"; \
+     done; \
   done \
   && chown -R opencode:opencode /opt/auto-install-shims \
   && mkdir -p /home/opencode/workspace \
