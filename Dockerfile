@@ -17,7 +17,11 @@ ARG IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 # ---------------------------------------------------------------------------
 # runtime: minimal runtime layer (apt, user, sudo, init)
 # ---------------------------------------------------------------------------
-FROM ubuntu:26.04 AS runtime
+# Pin the last known-good Ubuntu 26.04 multi-arch image. The 2026-07-16
+# refresh breaks portable-ruby extraction during emulated amd64 builds with
+# spurious ENOSYS ("Function not implemented") errors from tar.
+# Related: https://github.com/orbstack/orbstack/issues/2588
+FROM ubuntu:26.04@sha256:b7f48194d4d8b763a478a621cdc81c27be222ba2206ca3ca6bc42b49685f3d9e AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
