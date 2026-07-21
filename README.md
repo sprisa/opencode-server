@@ -62,6 +62,8 @@ The server starts on port 4096. Mount your project at `/home/opencode` to persis
 | `OPENCODE_PORT` | `4096` | Port the server listens on |
 | `OPENCODE_SERVER_PASSWORD` | *(none)* | Optional auth password for the server |
 | `OPENCODE_CORS_ORIGIN` | *(none)* | Optional CORS origin; omit to disable CORS |
+| `OPENCODE_PRINT_LOGS` | `false` | Set to `true` to print OpenCode logs to container stderr |
+| `OPENCODE_LOG_LEVEL` | *(OpenCode default)* | Optional `DEBUG`, `INFO`, `WARN`, or `ERROR` log level |
 
 ### Examples
 
