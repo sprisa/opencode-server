@@ -108,7 +108,11 @@ FROM runtime
 ARG OPENCODE_VERSION
 ARG IMAGE_CREATED
 
-ENV PATH=/opt/mise/shims:/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/opencode/.local/share/zerobrew/prefix/bin:/opt/auto-install-shims:${PATH}
+# mise/auto-install shims go LAST: they are "tool not installed" fallbacks that
+# exec `mise exec <tool>`, so anything explicitly installed into a real bin dir
+# (~/.local/bin, Homebrew, zerobrew, or /usr/local/bin via the base ${PATH})
+# MUST win over the shim.
+ENV PATH=/home/opencode/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/opencode/.local/share/zerobrew/prefix/bin:${PATH}:/opt/mise/shims:/opt/auto-install-shims
 ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
