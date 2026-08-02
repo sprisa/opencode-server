@@ -1,13 +1,19 @@
-# sprisa/opencode
+# Opencode Server
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/sprisa/opencode)](https://hub.docker.com/r/sprisa/opencode) [![Docker Image Size](https://img.shields.io/docker/image-size/sprisa/opencode)](https://hub.docker.com/r/sprisa/opencode)
  [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/opencode-server)](https://artifacthub.io/packages/search?repo=opencode-server)
 
 [![GitHub Health](https://shieldcn.dev/group/github/stars/sprisa/opencode-server+github/forks/sprisa/opencode-server+github/release/sprisa/opencode-server+github/last-commit/sprisa/opencode-server.svg?variant=secondary&size=xs)](https://github.com/sprisa/opencode-server)
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/opencode-server?referralCode=KSFpZz&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 
-A general-purpose Ubuntu Docker image for running [opencode](https://github.com/anomalyco/opencode). Published to Docker Hub as `sprisa/opencode:<version>` where `<version>` matches the release pinned in `version.txt`.
+
+A fully featured Ubuntu Docker image for running [opencode](https://github.com/anomalyco/opencode). Minimal image size with support for agent installable tools and CLIs with `mise`.
+
+Built for Docker and Kubernetes support.
+
+Published to Docker Hub as `sprisa/opencode:<version>` where `<version>` matches the release pinned in `version.txt`.
 
 ## What's inside
 
