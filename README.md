@@ -37,15 +37,15 @@ These tools install on first use (via mise → github/zerobrew):
 |---|---|---|
 | GitHub CLI | `gh` | github |
 | jq | `jq` | github |
-| GitLab CLI | `glab` | zerobrew |
+| GitLab CLI | `glab` | core |
 | Ruby | `ruby` | zerobrew |
 | ripgrep | `rg` | github |
 | fd | `fd` | github |
 | Wget | `wget` | zerobrew |
-| Vim | `vim` | zerobrew |
+| Vim | `vim` | core |
 | Micro | `micro` | github |
 | Nano | `nano` | zerobrew |
-| Python 3 | `python3` | zerobrew |
+| Python 3 | `python3` | core |
 | Node.js | `node` | core |
 | Sapling | `sl` | github |
 

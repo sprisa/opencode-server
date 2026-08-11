@@ -1,15 +1,15 @@
 [tools]
 "github:cli/cli" = "latest"          # shim:gh
 "github:jqlang/jq" = "latest"
-"zerobrew:glab" = "latest"
+"glab" = "latest"
 "zerobrew:ruby" = "latest"
 "github:BurntSushi/ripgrep" = "latest"  # shim:rg
 "github:sharkdp/fd" = "latest"
 "zerobrew:wget" = "latest"
-"zerobrew:vim" = "latest"
+"vim" = "latest"
 "github:zyedidia/micro" = "latest"
 "zerobrew:nano" = "latest"
-"zerobrew:python" = "latest"
+"python" = "latest"
 "node" = "latest"
 "npm" = "latest"              # shim:npm,npx
 "github:facebook/sapling" = "latest"    # shim:sl
