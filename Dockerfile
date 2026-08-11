@@ -60,15 +60,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
 # 1. Homebrew — partial clone with --filter=blob:none avoids downloading
-#    all past file versions, saving ~70 MB while keeping brew update working.
+#    all past file versions, saving ~70 MB while retaining the git metadata
+#    Homebrew expects. The release tag is pinned for reproducible builds.
+ARG HOMEBREW_VERSION=6.0.16
 RUN mkdir -p /home/linuxbrew \
   && chown opencode:opencode /home/linuxbrew \
   && sudo -u opencode git clone --filter=blob:none \
+    --branch "${HOMEBREW_VERSION}" \
     https://github.com/Homebrew/brew /home/linuxbrew/.linuxbrew/Homebrew \
+  && sudo -u opencode git -C /home/linuxbrew/.linuxbrew/Homebrew \
+    checkout --quiet -B stable "${HOMEBREW_VERSION}" \
   && sudo -u opencode mkdir -p /home/linuxbrew/.linuxbrew/bin \
   && sudo -u opencode ln -sf \
     /home/linuxbrew/.linuxbrew/Homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew \
-  && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew update --force \
   && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew cleanup --prune=all \
   && sudo -u opencode rm -rf "$(sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew --cache)" \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test \
@@ -79,17 +83,38 @@ RUN mkdir -p /home/linuxbrew \
   && rm -rf /home/linuxbrew/.linuxbrew/share/zsh \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/homebrew/homebrew-core
 
+ARG MISE_VERSION=2026.8.3
+ARG MISE_ZEROBREW_PLUGIN_COMMIT=998174989a12910f82c1f6e791a432731ed2647d
+
 # 1.5. mise — dev tool manager; pre-approved tools defined in the global config
-#     auto-install via zerobrew backend on first use at runtime.
-RUN curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh \
+#     auto-install via zerobrew backend on first use at runtime. The release is
+#     pinned so Docker caching cannot silently retain an old moving target.
+RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH=/usr/local/bin/mise sh \
   && mkdir -p /opt/mise \
-  && MISE_DATA_DIR=/opt/mise mise plugins install zerobrew https://github.com/kennyg/mise-zerobrew \
+  && MISE_DATA_DIR=/opt/mise mise plugins install zerobrew "https://github.com/kennyg/mise-zerobrew#${MISE_ZEROBREW_PLUGIN_COMMIT}" \
   && sed -i '/quoted_path .. " install /i\    cmd.exec(quoted_zb .. " --root " .. quoted_path .. " init")' /opt/mise/plugins/zerobrew/hooks/backend_install.lua
 
 # 1.6. zerobrew — fast Homebrew alternative; used as mise backend
-RUN sudo -u opencode HOME=/home/opencode NONINTERACTIVE=1 /bin/bash -c " \
-  curl -fsSL https://zerobrew.rs/install | bash -s -- --no-modify-path \
-"
+ARG ZEROBREW_VERSION=0.3.2
+RUN set -eux; \
+  case "$(uname -m)" in \
+    x86_64) ZEROBREW_ARCH=x64 ;; \
+    aarch64) ZEROBREW_ARCH=arm64 ;; \
+    *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
+  esac; \
+  base_url="https://github.com/lucasgelfond/zerobrew/releases/download/v${ZEROBREW_VERSION}"; \
+  download_dir="$(mktemp -d)"; \
+  trap 'rm -rf "$download_dir"' 0; \
+  curl -fsSL "${base_url}/SHA256SUMS" -o "${download_dir}/SHA256SUMS"; \
+  curl -fsSL "${base_url}/zb-linux-${ZEROBREW_ARCH}" -o "${download_dir}/zb-linux-${ZEROBREW_ARCH}"; \
+  curl -fsSL "${base_url}/zbx-linux-${ZEROBREW_ARCH}" -o "${download_dir}/zbx-linux-${ZEROBREW_ARCH}"; \
+  (cd "$download_dir" && sha256sum -c --ignore-missing SHA256SUMS); \
+  install -Dm755 "${download_dir}/zb-linux-${ZEROBREW_ARCH}" /home/opencode/.local/bin/zb; \
+  install -Dm755 "${download_dir}/zbx-linux-${ZEROBREW_ARCH}" /home/opencode/.local/bin/zbx; \
+  mkdir -p /home/opencode/.local/share/zerobrew; \
+  chown -R opencode:opencode /home/opencode/.local; \
+  sudo -u opencode HOME=/home/opencode XDG_DATA_HOME=/home/opencode/.local/share \
+    /home/opencode/.local/bin/zb init --no-modify-path
 
 ARG OPENCODE_VERSION
 
@@ -156,7 +181,7 @@ RUN opencode --version \
   && printf '\neval "$(mise activate zsh)"\n' >> /home/opencode/.zshrc \
   && mkdir -p /home/opencode/.config/fish \
   && printf '\nmise activate fish | source\n' >> /home/opencode/.config/fish/config.fish \
-  && printf '\neval "$(mise activate sh)"\n' >> /home/opencode/.profile \
+  && printf '\nif [ -n "${BASH_VERSION:-}" ]; then eval "$(mise activate bash)"; fi\n' >> /home/opencode/.profile \
   && mkdir -p /opt/auto-install-shims \
   && grep -E '^\s*"' /etc/mise/config.toml | while IFS='=' read -r key value; do \
   key="$(echo "$key" | tr -d ' "')" \
