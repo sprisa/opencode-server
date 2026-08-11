@@ -9,7 +9,7 @@
 "vim" = "latest"
 "github:zyedidia/micro" = "latest"
 "zerobrew:nano" = "latest"
-"python" = "latest"
+"python" = "latest"                 # shim:python,python3
 "node" = "latest"
 "npm" = "latest"              # shim:npm,npx
 "github:facebook/sapling" = "latest"    # shim:sl

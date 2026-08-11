@@ -73,6 +73,9 @@ jobs:
           test "npx works in interactive shell" \
             "$IN -i -c 'source ~/.bashrc 2>/dev/null; npx --version'"
 
+          test "python3 works in interactive shell" \
+            "$IN -i -c 'source ~/.bashrc 2>/dev/null; python3 --version'"
+
           test "gh works in interactive shell" \
             "$IN -i -c 'source ~/.bashrc 2>/dev/null; gh --version'"
 
@@ -91,6 +94,9 @@ jobs:
 
           test "npx works in non-interactive shell" \
             "$IN -c 'which npx && npx --version'"
+
+          test "python3 resolves from auto-install-shims" \
+            "$IN -c 'which python3 | grep -q /opt/auto-install-shims/python3 && python3 --version'"
 
           echo "=== mise use (non-interactive, via BASH_ENV fallback) ==="
 
