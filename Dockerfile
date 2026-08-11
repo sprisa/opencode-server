@@ -170,12 +170,15 @@ COPY --from=builder --chown=opencode:opencode /home/opencode/.local/share/zerobr
 COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
 COPY --from=builder --chown=opencode:opencode /opt/mise /opt/mise
 COPY mise-config.toml /etc/mise/config.toml
+COPY mise-instructions.md /etc/opencode/mise-instructions.md
 
 # Opencode
 COPY --from=builder /opt/opencode /usr/local/bin/opencode
 
 # Verify runtime and set up login-shell PATH and auto-install handler
 RUN opencode --version \
+  && mkdir -p /etc/opencode \
+  && printf '%s\n' '{"$schema":"https://opencode.ai/config.json","instructions":["/etc/opencode/mise-instructions.md"]}' > /etc/opencode/opencode.json \
   && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin" "$HOME/.local/share/zerobrew/prefix/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \
   && chmod 0644 /etc/profile.d/brew-path.sh \
   && printf '\neval "$(mise activate bash)"\n' >> /home/opencode/.bashrc \

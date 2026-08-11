@@ -28,6 +28,15 @@ if [ "$(docker inspect -f '{{.State.Running}}' "${NAME}")" != "true" ]; then
   exit 1
 fi
 
+config="$(docker exec "${NAME}" opencode debug config --pure)"
+case "${config}" in
+  *"/etc/opencode/mise-instructions.md"*) ;;
+  *)
+    echo "mise instruction was not loaded into OpenCode config" >&2
+    exit 1
+    ;;
+esac
+
 sleep 4
 if docker exec "${NAME}" bash -c 'for path in /opt/mise/installs/claude/*/claude; do [ -x "$path" ] && exit 0; done; exit 1'; then
   echo "home tool installed while the feature was disabled" >&2
