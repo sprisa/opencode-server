@@ -142,6 +142,7 @@ ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
 ENV MISE_ALWAYS_INSTALL=1
+ENV OPENCODE_INSTALL_HOME_TOOLS=false
 
 LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/sprisa/opencode-server/refs/heads/main/README.md" \
   org.opencontainers.image.created="${IMAGE_CREATED}" \

@@ -59,6 +59,9 @@ jobs:
 
           IN="docker run --rm -e GITHUB_TOKEN --entrypoint bash opencode-test:latest"
 
+          test "home-tool installer works in the real image" \
+            "bash test-home-tools-e2e.sh opencode-test:latest"
+
           echo "=== Pre-installed tools (interactive) ==="
 
           test "node works in interactive shell" \

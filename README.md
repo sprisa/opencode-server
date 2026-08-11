@@ -70,6 +70,7 @@ The server starts on port 4096. Mount your project at `/home/opencode` to persis
 | `OPENCODE_CORS_ORIGIN` | *(none)* | Optional CORS origin; omit to disable CORS |
 | `OPENCODE_PRINT_LOGS` | `false` | Set to `true` to print OpenCode logs to container stderr |
 | `OPENCODE_LOG_LEVEL` | *(OpenCode default)* | Optional `DEBUG`, `INFO`, `WARN`, or `ERROR` log level |
+| `OPENCODE_INSTALL_HOME_TOOLS` | `false` | After a 3-second delay, install tools from `~/.config/mise/config.toml` in the background |
 
 ### Examples
 
