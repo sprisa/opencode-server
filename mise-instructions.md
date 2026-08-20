@@ -8,4 +8,4 @@ Prefer `mise` over `apt` for missing development tools and runtimes.
 - `mise exec <tool> -- <command>`: one-off use.
 
 Use `@<version>` only when pinning is required. Use `apt` only for system
-packages mise cannot manage. Image tools install lazily; do not bulk-install.
+packages mise cannot manage (you must check first). Image tools install lazily; do not bulk-install.
