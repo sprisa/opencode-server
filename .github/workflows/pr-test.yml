@@ -8,9 +8,26 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Runtime behavior tests
+  release-tests:
+    name: Release automation tests
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-task@v2
+      - run: python3 test-release-automation.py
+      - run: bash test-bump-version.sh
+
+  test:
+    name: Runtime behavior tests (${{ matrix.track }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - track: v2
+            version_file: version.txt
+          - track: v1
+            version_file: version-v1.txt
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,7 +38,7 @@ jobs:
       - name: Read version
         id: version
         run: |
-          VERSION=$(cat version.txt | tr -d '[:space:]')
+          VERSION=$(cat "${{ matrix.version_file }}" | tr -d '[:space:]')
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build image
@@ -59,8 +76,14 @@ jobs:
 
           IN="docker run --rm -e GITHUB_TOKEN --entrypoint bash opencode-test:latest"
 
+          test "server entrypoint, authentication, and flags work in the real image" \
+            "bash test-server-e2e.sh opencode-test:latest"
+
           test "home-tool installer works in the real image" \
             "bash test-home-tools-e2e.sh opencode-test:latest"
+
+          test "package managers and zerobrew-backed lazy tools work in the real image" \
+            "bash test-toolchain-e2e.sh opencode-test:latest"
 
           echo "=== Pre-installed tools (interactive) ==="
 

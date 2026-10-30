@@ -3,6 +3,12 @@
 # Run: bash test-bump-version.sh
 set -euo pipefail
 
+# Temporary fixture commits must also work on CI runners with no Git identity.
+export GIT_AUTHOR_NAME="Release Test"
+export GIT_AUTHOR_EMAIL="test@example.com"
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/scripts/bump-version.sh"
 
 log()   { echo "  $*"; }
@@ -120,6 +126,22 @@ c6=$(grep -c 'pr edit' "$S6/calls.txt" 2>/dev/null || echo 0)
 rm -f /tmp/gh-mock/force_pr
 if [ "$c6" -ge 1 ]; then pass; else fail "expected 'gh pr edit', got: $(cat "$S6/calls.txt" 2>/dev/null || echo "empty")"; fi
 rm -rf "$S6"
+
+# ── Test 7: Explicit version file — v1 track writes version-v1.txt ──────────────
+log "Test 7: Explicit version file (version-v1.txt)..."
+S7="$(prep)"
+echo "2.2.4" > "$S7/version.txt"
+echo "1.19.4" > "$S7/version-v1.txt"
+pushd "$S7" >/dev/null
+git init -q && git add version.txt version-v1.txt && git commit -q --allow-empty -m "init"
+GH_CALLS="$S7/calls.txt" GH_TOKEN="mock" \
+  PATH="$S7/bin:$PATH" bash "$SCRIPT" "1.19.5" main version-v1.txt >/dev/null 2>&1
+popd >/dev/null
+if [ "$(cat "$S7/version-v1.txt" 2>/dev/null | tr -d '[:space:]')" = "1.19.5" ] \
+   && [ "$(cat "$S7/version.txt" | tr -d '[:space:]')" = "2.2.4" ] \
+   && grep -q 'pr create' "$S7/calls.txt" 2>/dev/null; then pass
+else fail "version-v1.txt not written or version.txt modified"; fi
+rm -rf "$S7"
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""

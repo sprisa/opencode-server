@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Bump opencode version and create/update a PR.
-# Usage: scripts/bump-version.sh <upstream-version> <target-branch>
+# Usage: scripts/bump-version.sh <upstream-version> <target-branch> [version-file]
 # Requires: curl, jq, gh, git
 set -euo pipefail
 
-VERSION="${1:?usage: bump-version.sh <upstream-version>}"
+VERSION="${1:?usage: bump-version.sh <upstream-version> [target-branch] [version-file]}"
 VERSION="${VERSION#v}"
 BRANCH="pr/opencode-release/v${VERSION}"
 TARGET="${2:-main}"
+VERSION_FILE="${3:-version.txt}"
 UPSTREAM_REPO="anomalyco/opencode"
 
 log() { echo "[bump] $*"; }
@@ -67,12 +68,12 @@ log "Checking for existing PR for v${VERSION}..."
 
 git fetch origin "$BRANCH" 2>/dev/null && git checkout "$BRANCH" || git checkout -b "$BRANCH"
 
-echo "$VERSION" > version.txt
+echo "$VERSION" > "$VERSION_FILE"
 
-if git diff --quiet HEAD -- version.txt; then
-  log "version.txt already up to date"
+if git ls-files --error-unmatch "$VERSION_FILE" >/dev/null 2>&1 && git diff --quiet HEAD -- "$VERSION_FILE"; then
+  log "version file already up to date"
 else
-  git add version.txt
+  git add "$VERSION_FILE"
   git commit -m "feat: opencode release v${VERSION}"
   git push origin "$BRANCH"
 fi

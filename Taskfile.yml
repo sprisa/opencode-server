@@ -7,10 +7,14 @@ vars:
   REGISTRY: docker.io
   OWNER: sprisa
   IMAGE: opencode
-  RELEASE_REPO: "{{.OWNER}}/opencode-docker"
+  RELEASE_REPO: "{{.OWNER}}/opencode-server"
+  RELEASE_COMMIT:
+    sh: git rev-parse HEAD
   OCI: "{{.REGISTRY}}/{{.OWNER}}/{{.IMAGE}}"
   VERSION:
     sh: cat version.txt | tr -d '[:space:]'
+  VERSION_V1:
+    sh: cat version-v1.txt | tr -d '[:space:]'
 
 tasks:
   default:
@@ -20,23 +24,30 @@ tasks:
     silent: true
 
   update:
-    desc: Fetch latest opencode release version from GitHub and update version.txt
+    desc: Fetch latest opencode releases from GitHub and update version.txt (v2) and version-v1.txt (v1)
     preconditions:
-      - sh: command -v curl >/dev/null
-        msg: "curl not found"
+      - sh: command -v gh >/dev/null
+        msg: "GitHub CLI not found. Install it: brew install gh"
       - sh: command -v jq >/dev/null
         msg: "jq not found. Install it: brew install jq"
     cmds:
       - |
-        LATEST=$(curl -fsSL https://api.github.com/repos/anomalyco/opencode/releases/latest \
-          | jq -r '.tag_name' | sed 's/^v//')
-        CURRENT=$(cat version.txt | tr -d '[:space:]')
-        if [ "$LATEST" != "$CURRENT" ]; then
-          echo "$LATEST" > version.txt
-          echo "Updated: $CURRENT -> $LATEST"
-        else
-          echo "Already at latest: $CURRENT"
-        fi
+        RELEASES=$(bash ./scripts/latest-releases.sh)
+        update_track() {
+          local file="$1" track="$2"
+          local latest cur
+          latest="$(printf '%s' "$RELEASES" | jq -er --arg track "$track" '.[$track]')"
+          cur="$(cat "$file" 2>/dev/null | tr -d '[:space:]' || true)"
+          if [ -z "$cur" ] || jq -en --arg latest "$latest" --arg current "$cur" \
+            '($latest | split(".") | map(tonumber)) > ($current | split(".") | map(tonumber))' >/dev/null; then
+            echo "$latest" > "$file"
+            echo "$file updated: ${cur:-none} -> $latest"
+          else
+            echo "$file is up to date: $cur (upstream: $latest)"
+          fi
+        }
+        update_track version.txt v2
+        update_track version-v1.txt v1
 
   docker:build:
     desc: "Build the image locally (tag: sprisa/opencode:<version>)"
@@ -44,7 +55,7 @@ tasks:
       - docker build --build-arg OPENCODE_VERSION={{.VERSION}} --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" -t {{.OCI}}:{{.VERSION}} .
 
   docker:push:
-    desc: "Build and push multi-arch to Docker Hub with <version> and :latest tags"
+    desc: "Build and push multi-arch v2 image to Docker Hub with <version>, :latest, and :v2 tags"
     cmds:
       - |
         docker buildx build \
@@ -54,8 +65,9 @@ tasks:
           --push \
           -t {{.OCI}}:{{.VERSION}} \
           -t {{.OCI}}:latest \
+          -t {{.OCI}}:v2 \
           .
-      - "echo Pushed {{.OCI}}:{{.VERSION}} and {{.OCI}}:latest"
+      - "echo Pushed {{.OCI}}:{{.VERSION}}, {{.OCI}}:latest and {{.OCI}}:v2"
 
   docker:login:
     desc: "Log in to Docker Hub (needs $DOCKER_USER and $DOCKER_PASS)"
@@ -68,13 +80,55 @@ tasks:
       - "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
 
   publish:
-    desc: "Push the image and create a GitHub Release (run docker:login first)"
-    deps: [docker:push]
+    desc: "Push both pinned tracks (v2 + v1) and create missing GitHub Releases"
     preconditions:
       - sh: command -v gh >/dev/null
         msg: "GitHub CLI not found. Install it: brew install gh"
       - sh: gh auth status >/dev/null 2>&1
         msg: "Not logged in to GitHub CLI. Run: gh auth login"
     cmds:
-      - ./scripts/release-notes.sh v{{.VERSION}} {{.RELEASE_REPO}} > ./RELEASE_NOTES.md
-      - gh release create v{{.VERSION}} --repo {{.RELEASE_REPO}} --title "v{{.VERSION}}" --notes-file ./RELEASE_NOTES.md
+      - task: publish:v2
+      - task: publish:v1
+
+  publish:v2:
+    desc: "Push the v2 image (:latest + :v2 + <version>) and create the v2 GitHub Release if missing"
+    cmds:
+      - task: docker:push
+      - |
+        if gh release view v{{.VERSION}} --repo {{.RELEASE_REPO}} >/dev/null 2>&1; then
+          echo "GitHub Release v{{.VERSION}} already exists, skipping"
+        else
+          ./scripts/release-notes.sh v{{.VERSION}} {{.RELEASE_REPO}} > ./RELEASE_NOTES.md
+          gh release create v{{.VERSION}} --repo {{.RELEASE_REPO}} --target {{.RELEASE_COMMIT}} --latest --title "v{{.VERSION}}" --notes-file ./RELEASE_NOTES.md
+        fi
+
+  publish:v1:
+    desc: "Push the v1 image (:latest stays on v2) with <version> and :v1 tags, create the v1 GitHub Release if missing"
+    cmds:
+      - task: docker:push:v1
+      - |
+        if gh release view v{{.VERSION_V1}} --repo {{.RELEASE_REPO}} >/dev/null 2>&1; then
+          echo "GitHub Release v{{.VERSION_V1}} already exists, skipping"
+        else
+          ./scripts/release-notes.sh v{{.VERSION_V1}} {{.RELEASE_REPO}} > ./RELEASE_NOTES.md
+          gh release create v{{.VERSION_V1}} --repo {{.RELEASE_REPO}} --target {{.RELEASE_COMMIT}} --latest=false --title "v{{.VERSION_V1}}" --notes-file ./RELEASE_NOTES.md
+        fi
+
+  docker:build:v1:
+    desc: "Build the v1 image locally (tag: sprisa/opencode:<v1-version>)"
+    cmds:
+      - docker build --build-arg OPENCODE_VERSION={{.VERSION_V1}} --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" -t {{.OCI}}:{{.VERSION_V1}} .
+
+  docker:push:v1:
+    desc: "Build and push multi-arch v1 image to Docker Hub with <version> and :v1 tags (:latest stays on v2)"
+    cmds:
+      - |
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --build-arg OPENCODE_VERSION={{.VERSION_V1}} \
+          --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+          --push \
+          -t {{.OCI}}:{{.VERSION_V1}} \
+          -t {{.OCI}}:v1 \
+          .
+      - "echo Pushed {{.OCI}}:{{.VERSION_V1}} and {{.OCI}}:v1"

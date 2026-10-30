@@ -1,28 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p "${HOME}/.config/opencode" "${HOME}/workspace"
-cd "${HOME}/workspace"
+source /usr/local/lib/opencode/init-home.sh
 
-# This is opt-in because customer-configured tools can be large and compete with
-# the server for resources after startup. Keep system and project tools lazy: the
-# home ceiling plus a null system config scopes this install to the global user
-# config at ~/.config/mise/config.toml.
-if [ "${OPENCODE_INSTALL_HOME_TOOLS:-false}" = "true" ] && [ -f "${HOME}/.config/mise/config.toml" ]; then
-  (
-    sleep 3
-    if ! MISE_SYSTEM_CONFIG_FILE=/dev/null MISE_CEILING_PATHS="${HOME}" \
-      mise -C "${HOME}" install --yes; then
-      printf '%s\n' 'opencode: home tool installation failed' >&2
-    fi
-  ) &
-fi
-
+# v2 reads OPENCODE_PASSWORD (or the legacy OPENCODE_SERVER_PASSWORD) directly.
+# Leave both unset to let v2 generate a password and print it on startup.
+# Foreground serve honors these credentials; --service uses its own saved config.
 args=(serve --hostname 0.0.0.0 --port "${OPENCODE_PORT:-4096}")
-if [ "${OPENCODE_PRINT_LOGS:-false}" = "true" ]; then
-  args+=(--print-logs)
-fi
+case "${OPENCODE_PRINT_LOGS:-false}" in
+  true|1)
+    export OPENCODE_PRINT_LOGS=1
+    args+=(--print-logs)
+    ;;
+esac
 if [ -n "${OPENCODE_LOG_LEVEL:-}" ]; then
+  # v2's CLI requires lowercase levels; accept the existing uppercase image ENV.
+  export OPENCODE_LOG_LEVEL="$(printf '%s' "${OPENCODE_LOG_LEVEL}" | tr '[:upper:]' '[:lower:]')"
   args+=(--log-level "${OPENCODE_LOG_LEVEL}")
 fi
 if [ -n "${OPENCODE_CORS_ORIGIN:-}" ]; then
