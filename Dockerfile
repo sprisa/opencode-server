@@ -2,7 +2,7 @@
 #
 # Runs `opencode serve` as the unprivileged `opencode` user (uid/gid 1000) on an
 # Ubuntu base with a broad, familiar dev toolchain. All configuration is env-driven
-# (OPENCODE_SERVER_PASSWORD, OPENCODE_CORS_ORIGIN, OPENCODE_PORT). The entire home
+# (OPENCODE_PASSWORD / OPENCODE_SERVER_PASSWORD, OPENCODE_CORS_ORIGIN, OPENCODE_PORT). The entire home
 # directory (/home/opencode) is the persistent mount point; the active project
 # lives under ~/workspace.
 #
@@ -41,10 +41,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && find /var/log -type f -delete 2>/dev/null; \
   rm -f /var/cache/debconf/*.dat 2>/dev/null || true
 
-# Entrypoint (tini + init script)
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod 0755 /usr/local/bin/entrypoint.sh
-
 # ---------------------------------------------------------------------------
 # builder: runtime + compiler toolchain + relocatable toolchains —
 # only what's explicitly COPIED to final lands in the runtime image.
@@ -62,7 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 1. Homebrew — partial clone with --filter=blob:none avoids downloading
 #    all past file versions, saving ~70 MB while retaining the git metadata
 #    Homebrew expects. The release tag is pinned for reproducible builds.
-ARG HOMEBREW_VERSION=6.0.16
+ARG HOMEBREW_VERSION=7.0.11
 RUN mkdir -p /home/linuxbrew \
   && chown opencode:opencode /home/linuxbrew \
   && sudo -u opencode git clone --filter=blob:none \
@@ -83,7 +79,7 @@ RUN mkdir -p /home/linuxbrew \
   && rm -rf /home/linuxbrew/.linuxbrew/share/zsh \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/homebrew/homebrew-core
 
-ARG MISE_VERSION=2026.8.3
+ARG MISE_VERSION=2026.10.24
 ARG MISE_ZEROBREW_PLUGIN_COMMIT=998174989a12910f82c1f6e791a432731ed2647d
 
 # 1.5. mise — dev tool manager; pre-approved tools defined in the global config
@@ -95,14 +91,14 @@ RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PA
   && sed -i '/quoted_path .. " install /i\    cmd.exec(quoted_zb .. " --root " .. quoted_path .. " init")' /opt/mise/plugins/zerobrew/hooks/backend_install.lua
 
 # 1.6. zerobrew — fast Homebrew alternative; used as mise backend
-ARG ZEROBREW_VERSION=0.3.2
+ARG ZEROBREW_VERSION=0.4.2
 RUN set -eux; \
   case "$(uname -m)" in \
     x86_64) ZEROBREW_ARCH=x64 ;; \
     aarch64) ZEROBREW_ARCH=arm64 ;; \
     *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
   esac; \
-  base_url="https://github.com/lucasgelfond/zerobrew/releases/download/v${ZEROBREW_VERSION}"; \
+  base_url="https://github.com/zerobrewhq/zerobrew/releases/download/v${ZEROBREW_VERSION}"; \
   download_dir="$(mktemp -d)"; \
   trap 'rm -rf "$download_dir"' 0; \
   curl -fsSL "${base_url}/SHA256SUMS" -o "${download_dir}/SHA256SUMS"; \
@@ -119,7 +115,12 @@ RUN set -eux; \
 ARG OPENCODE_VERSION
 
 # 2. opencode server binary — changes on every version bump (most frequent)
-RUN curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash \
+# Upstream splits installers by major: opencode.ai/install only accepts v1
+# releases and opencode.ai/v2/install only accepts v2 releases. Both install
+# to ~/.opencode/bin/opencode and honor $VERSION.
+RUN major="$(printf '%s' "${OPENCODE_VERSION}" | cut -d. -f1)" \
+  && case "$major" in 1) installer="https://opencode.ai/install" ;; *) installer="https://opencode.ai/v2/install" ;; esac \
+  && curl -fsSL "$installer" | VERSION="${OPENCODE_VERSION}" bash \
   && (cp /root/.opencode/bin/opencode /opt/opencode 2>/dev/null \
   || cp "$HOME/.opencode/bin/opencode" /opt/opencode) \
   && chmod 0755 /opt/opencode \
@@ -143,6 +144,10 @@ ENV HOMEBREW_INSTALL_FROM_API=1
 ENV MISE_DATA_DIR=/opt/mise
 ENV MISE_ALWAYS_INSTALL=1
 ENV OPENCODE_INSTALL_HOME_TOOLS=false
+ENV OPENCODE_PORT=4096
+ENV OPENCODE_PRINT_LOGS=false
+# Do not set a default password ENV: v2 generates one when both password names
+# are absent, and OPENCODE_PASSWORD takes precedence over the legacy name.
 
 LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/sprisa/opencode-server/refs/heads/main/README.md" \
   org.opencontainers.image.created="${IMAGE_CREATED}" \
@@ -175,8 +180,19 @@ COPY mise-instructions.md /etc/opencode/mise-instructions.md
 # Opencode
 COPY --from=builder /opt/opencode /usr/local/bin/opencode
 
+# Select the major-specific entrypoint at build time. Keep these late so startup
+# script changes reuse the toolchain layers.
+COPY entrypoint.sh entrypoint-v1.sh scripts/init-home.sh /usr/local/lib/opencode/
+RUN case "${OPENCODE_VERSION}" in \
+      1.*) entrypoint=entrypoint-v1.sh ;; \
+      2.*) entrypoint=entrypoint.sh ;; \
+      *) echo "unsupported opencode version: ${OPENCODE_VERSION}" >&2; exit 1 ;; \
+    esac \
+  && install -m 0755 "/usr/local/lib/opencode/${entrypoint}" /usr/local/bin/entrypoint.sh
+
 # Verify runtime and set up login-shell PATH and auto-install handler
 RUN opencode --version \
+  && install -m 0644 /dev/null /etc/mise/empty.toml \
   && mkdir -p /etc/opencode \
   && printf '%s\n' '{"$schema":"https://opencode.ai/config.json","instructions":["/etc/opencode/mise-instructions.md"]}' > /etc/opencode/opencode.json \
   && printf 'for d in "$HOME/.local/bin" "/home/linuxbrew/.linuxbrew/bin" "/home/linuxbrew/.linuxbrew/sbin" "$HOME/.local/share/zerobrew/prefix/bin"; do case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac; done\nexport PATH\n' > /etc/profile.d/brew-path.sh \

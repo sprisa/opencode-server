@@ -1,6 +1,7 @@
 # Automated check for upstream opencode releases.
-# Runs every 12 hours.
-# If a new release is found, bumps version.txt and opens a PR.
+# Runs every 12 hours, once per supported major-version track.
+# If a new release is found on a track, bumps that track's version file
+# (v2 -> version.txt [default], v1 -> version-v1.txt [legacy]) and opens a PR.
 name: "opencode release checker"
 
 on:
@@ -18,37 +19,54 @@ env:
 
 jobs:
   check-bump:
-    name: Check and bump
+    name: Check and bump (${{ matrix.track }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - track: v2
+            version_file: version.txt
+          - track: v1
+            version_file: version-v1.txt
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get upstream latest
+      - name: Get upstream latest (${{ matrix.track }})
         id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(curl -fsSL "https://api.github.com/repos/${UPSTREAM_REPO}/releases/latest" \
-            | jq -r '.tag_name' | sed 's/^v//')
+          RELEASES=$(bash ./scripts/latest-releases.sh)
+          VERSION=$(printf '%s' "$RELEASES" | jq -er --arg track "${{ matrix.track }}" '.[$track]')
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Upstream: ${VERSION}"
+          echo "Upstream ${{ matrix.track }}: ${VERSION:-none}"
 
       - name: Read current version
         id: current
         run: |
-          VERSION=$(cat version.txt | tr -d '[:space:]')
+          VERSION=$(tr -d '[:space:]' < "${{ matrix.version_file }}")
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Current: ${VERSION}"
 
-      - name: Skip if up to date
-        if: steps.latest.outputs.version == steps.current.outputs.version
+      - name: Decide whether to bump
+        id: decide
         run: |
-          echo "::notice::Version is up to date ($(cat version.txt | tr -d '[:space:]'))"
-          exit 0
+          LATEST="${{ steps.latest.outputs.version }}"
+          CURRENT="${{ steps.current.outputs.version }}"
+          if jq -en --arg latest "$LATEST" --arg current "$CURRENT" \
+            '($latest | split(".") | map(tonumber)) > ($current | split(".") | map(tonumber))' >/dev/null; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::${{ matrix.track }} is up to date (${CURRENT}; upstream: ${LATEST})"
+            echo "update=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Reset PR branch to latest main
-        if: steps.latest.outputs.version != steps.current.outputs.version
+        if: steps.decide.outputs.update == 'true'
         env:
           PR_VERSION: ${{ steps.latest.outputs.version }}
         run: |
@@ -59,11 +77,12 @@ jobs:
           git push origin "$PR_BRANCH" --force
 
       - name: Bump and create PR
-        if: steps.latest.outputs.version != steps.current.outputs.version
+        if: steps.decide.outputs.update == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_VERSION: ${{ steps.latest.outputs.version }}
+          VERSION_FILE: ${{ matrix.version_file }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          ./scripts/bump-version.sh "$PR_VERSION" "${{ env.TARGET_BRANCH }}"
+          ./scripts/bump-version.sh "$PR_VERSION" "${{ env.TARGET_BRANCH }}" "$VERSION_FILE"

@@ -13,12 +13,27 @@
 set -euo pipefail
 
 TAG="${1:?usage: release-notes.sh <new-tag> [owner/repo]}"
-REPO="${2:-${RELEASE_REPO:-sprisa/opencode}}"
+REPO="${2:-${RELEASE_REPO:-sprisa/opencode-server}}"
 REPO_URL="https://github.com/${REPO}"
 VERSION="${TAG#v}"          # image version without the leading "v"
 
-# Previous release tag (newest v* tag that isn't the one we're cutting).
-PREV="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n1 || true)"
+# Highest older stable version in this commit's history. This prefers the same
+# major, falls back to a lower major for the first release of a new line, and
+# excludes newer versions when regenerating notes for an older release.
+IFS=. read -r MAJOR MINOR PATCH <<< "${VERSION%%[-+]*}"
+MAJOR=$((10#$MAJOR)); MINOR=$((10#$MINOR)); PATCH=$((10#$PATCH))
+PREV=""
+while IFS= read -r candidate; do
+  [[ "$candidate" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || continue
+  major=$((10#${BASH_REMATCH[1]}))
+  minor=$((10#${BASH_REMATCH[2]}))
+  patch=$((10#${BASH_REMATCH[3]}))
+  if (( major < MAJOR || (major == MAJOR && minor < MINOR) ||
+        (major == MAJOR && minor == MINOR && patch < PATCH) )); then
+    PREV="$candidate"
+    break
+  fi
+done < <(git tag --merged HEAD --list 'v*' --sort=-v:refname)
 if [ -n "$PREV" ]; then
   RANGE="${PREV}..HEAD"
 else

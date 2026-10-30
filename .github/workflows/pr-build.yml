@@ -49,7 +49,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           git -C head fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED=$(git -C head diff "origin/${{ github.base_ref }}" HEAD --name-only -- Dockerfile version.txt entrypoint.sh)
+          CHANGED=$(git -C head diff "origin/${{ github.base_ref }}" HEAD --name-only -- Dockerfile version.txt version-v1.txt entrypoint.sh entrypoint-v1.sh scripts/init-home.sh)
           if [ -n "$CHANGED" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -63,13 +63,20 @@ jobs:
           ref: ${{ github.base_ref }}
           path: baseline
 
+      - name: Read baseline version
+        if: steps.check-diff.outputs.changed == 'true'
+        id: baseline-version
+        run: |
+          VERSION=$(tr -d '[:space:]' < baseline/version.txt)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Build baseline image
         if: steps.check-diff.outputs.changed == 'true'
         uses: docker/build-push-action@v6
         with:
           context: baseline
           load: true
-          build-args: OPENCODE_VERSION=${{ steps.version.outputs.version }}
+          build-args: OPENCODE_VERSION=${{ steps.baseline-version.outputs.version }}
           tags: sprisa/opencode:baseline
 
       - name: Record baseline size
