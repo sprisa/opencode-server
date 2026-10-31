@@ -144,6 +144,18 @@ task docker:push:v1                        # Push v1 as +<version> and +v1
 retains existing GitHub releases, and creates missing releases tagged at the
 checked-out commit. Only v2 releases are marked GitHub's **Latest** release.
 
+### Manual GitHub Actions publishing
+
+Run **Actions → Publish → Run workflow** to publish both pinned versions from
+`main`. Add these repository Actions secrets first:
+
+- `DOCKERHUB_USERNAME`: Docker Hub account with push access to `sprisa/opencode`.
+- `DOCKERHUB_TOKEN`: Docker Hub access token with Read & Write permissions.
+
+The workflow checks out `main` with full tag history, sets up multi-architecture
+builds, logs in to Docker Hub, and runs `task publish`. GitHub releases use the
+automatically provided `GITHUB_TOKEN` with `contents: write` permission.
+
 ## Updating the opencode version
 
 ```bash
