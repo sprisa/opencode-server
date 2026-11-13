@@ -83,7 +83,7 @@ ARG MISE_VERSION=2026.10.24
 ARG MISE_ZEROBREW_PLUGIN_COMMIT=998174989a12910f82c1f6e791a432731ed2647d
 
 # 1.5. mise — dev tool manager; pre-approved tools defined in the global config
-#     auto-install via zerobrew backend on first use at runtime. The release is
+#     auto-install on first use at runtime. The release is
 #     pinned so Docker caching cannot silently retain an old moving target.
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH=/usr/local/bin/mise sh \
   && mkdir -p /opt/mise \
@@ -189,6 +189,23 @@ RUN case "${OPENCODE_VERSION}" in \
       *) echo "unsupported opencode version: ${OPENCODE_VERSION}" >&2; exit 1 ;; \
     esac \
   && install -m 0755 "/usr/local/lib/opencode/${entrypoint}" /usr/local/bin/entrypoint.sh
+
+# Lock each "latest" tool in the system config to the release that is newest at
+# build time. First runs then download straight from the locked URL instead of
+# fetching release lists (codex's is ~10 MB, past mise's 3s timeout) or calling
+# the rate-limited GitHub API. Tools users add still resolve at runtime.
+# OPENCODE_VERSION is referenced so every opencode release re-locks rather than
+# reusing a cached layer. mise writes a temp file beside the lockfile whenever
+# it checks it, so the opencode user must own /etc/mise.
+RUN echo "locking mise tools for opencode ${OPENCODE_VERSION}" \
+  && cd / \
+  && MISE_LOCKFILE=1 MISE_FETCH_REMOTE_VERSIONS_TIMEOUT=60s \
+    MISE_CACHE_DIR=/tmp/mise-lock-cache MISE_STATE_DIR=/tmp/mise-lock-state \
+    mise lock -g --platform linux-x64,linux-arm64 \
+  && rm -rf /tmp/mise-lock-cache /tmp/mise-lock-state \
+  && chmod 0644 /etc/mise/mise.lock \
+  && chown opencode:opencode /etc/mise /etc/mise/mise.lock \
+  && chown -R opencode:opencode /opt/mise
 
 # Verify runtime and set up login-shell PATH and auto-install handler
 RUN opencode --version \

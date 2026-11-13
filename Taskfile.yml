@@ -80,7 +80,7 @@ tasks:
       - "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
 
   publish:
-    desc: "Push both pinned tracks (v2 + v1) and create missing GitHub Releases"
+    desc: "Push pinned tracks (v2 + v1) not yet on Docker Hub and create missing GitHub Releases (FORCE=true republishes)"
     preconditions:
       - sh: command -v gh >/dev/null
         msg: "GitHub CLI not found. Install it: brew install gh"
@@ -90,10 +90,19 @@ tasks:
       - task: publish:v2
       - task: publish:v1
 
+  # A version tag that already exists on Docker Hub is skipped, so publishing
+  # one track doesn't rebuild the other or move its :v1/:v2/:latest tags.
+  # FORCE=true republishes anyway, e.g. to ship image changes without a new
+  # opencode version.
   publish:v2:
-    desc: "Push the v2 image (:latest + :v2 + <version>) and create the v2 GitHub Release if missing"
+    desc: "Push the v2 image (:latest + :v2 + <version>) unless <version> is on Docker Hub, and create the v2 GitHub Release if missing"
     cmds:
-      - task: docker:push
+      - |
+        if [ "{{.FORCE}}" != "true" ] && docker buildx imagetools inspect {{.OCI}}:{{.VERSION}} >/dev/null 2>&1; then
+          echo "{{.OCI}}:{{.VERSION}} is already on Docker Hub, skipping push (FORCE=true republishes)"
+        else
+          task docker:push
+        fi
       - |
         if gh release view v{{.VERSION}} --repo {{.RELEASE_REPO}} >/dev/null 2>&1; then
           echo "GitHub Release v{{.VERSION}} already exists, skipping"
@@ -103,9 +112,14 @@ tasks:
         fi
 
   publish:v1:
-    desc: "Push the v1 image (:latest stays on v2) with <version> and :v1 tags, create the v1 GitHub Release if missing"
+    desc: "Push the v1 image (:latest stays on v2) with <version> and :v1 tags unless <version> is on Docker Hub, and create the v1 GitHub Release if missing"
     cmds:
-      - task: docker:push:v1
+      - |
+        if [ "{{.FORCE}}" != "true" ] && docker buildx imagetools inspect {{.OCI}}:{{.VERSION_V1}} >/dev/null 2>&1; then
+          echo "{{.OCI}}:{{.VERSION_V1}} is already on Docker Hub, skipping push (FORCE=true republishes)"
+        else
+          task docker:push:v1
+        fi
       - |
         if gh release view v{{.VERSION_V1}} --repo {{.RELEASE_REPO}} >/dev/null 2>&1; then
           echo "GitHub Release v{{.VERSION_V1}} already exists, skipping"
