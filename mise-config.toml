@@ -1,15 +1,22 @@
+[settings]
+ruby.compile = false                # runtime image has no compiler toolchain
+
 [tools]
-"github:cli/cli" = "latest"          # shim:gh
-"github:jqlang/jq" = "latest"
+"github-cli" = "latest"             # shim:gh
+"jq" = "latest"
 "glab" = "latest"
-"zerobrew:ruby" = "latest"
-"github:BurntSushi/ripgrep" = "latest"  # shim:rg
-"github:sharkdp/fd" = "latest"
+"ruby" = "latest"                   # shim:ruby,gem,bundle
+"ripgrep" = "latest"                # shim:rg
+"fd" = "latest"
 "zerobrew:wget" = "latest"
 "vim" = "latest"
-"github:zyedidia/micro" = "latest"
+"micro" = "latest"
 "zerobrew:nano" = "latest"
 "python" = "latest"                 # shim:python,python3
 "node" = "latest"
 "npm" = "latest"              # shim:npm,npx
 "github:facebook/sapling" = "latest"    # shim:sl
+"github:sprisa/clonetree" = "latest"
+"codex" = "latest"
+"claude" = "latest"
+"cloudflared" = "latest"

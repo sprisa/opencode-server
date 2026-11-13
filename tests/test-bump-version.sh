@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Quick manual test for bump-version.sh logic
-# Run: bash test-bump-version.sh
+# Run: bash tests/test-bump-version.sh
 set -euo pipefail
 
 # Temporary fixture commits must also work on CI runners with no Git identity.
@@ -9,7 +9,7 @@ export GIT_AUTHOR_EMAIL="test@example.com"
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 
-SCRIPT="$(cd "$(dirname "$0")" && pwd)/scripts/bump-version.sh"
+SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/scripts/bump-version.sh"
 
 log()   { echo "  $*"; }
 pass()  { log "PASS"; }
