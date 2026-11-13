@@ -40,16 +40,14 @@ jobs:
 
       - name: Record PR size
         id: pr-size
-        run: |
-          echo "human=$(docker images sprisa/opencode:pr-${{ github.event.number || 'manual' }} --format '{{.Size}}')" >> "$GITHUB_OUTPUT"
-          echo "bytes=$(docker image inspect sprisa/opencode:pr-${{ github.event.number || 'manual' }} --format '{{.Size}}')" >> "$GITHUB_OUTPUT"
+        run: bash head/scripts/image-size.sh "sprisa/opencode:pr-${{ github.event.number || 'manual' }}" >> "$GITHUB_OUTPUT"
 
       - name: Check if image-relevant files changed
         id: check-diff
         if: github.event_name == 'pull_request'
         run: |
           git -C head fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED=$(git -C head diff "origin/${{ github.base_ref }}" HEAD --name-only -- Dockerfile version.txt version-v1.txt entrypoint.sh entrypoint-v1.sh scripts/init-home.sh)
+          CHANGED=$(git -C head diff "origin/${{ github.base_ref }}" HEAD --name-only -- Dockerfile version.txt version-v1.txt entrypoint.sh entrypoint-v1.sh scripts/init-home.sh mise-config.toml mise-instructions.md)
           if [ -n "$CHANGED" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -82,44 +80,40 @@ jobs:
       - name: Record baseline size
         if: steps.check-diff.outputs.changed == 'true'
         id: baseline-size
-        run: |
-          echo "human=$(docker images sprisa/opencode:baseline --format '{{.Size}}')" >> "$GITHUB_OUTPUT"
-          echo "bytes=$(docker image inspect sprisa/opencode:baseline --format '{{.Size}}')" >> "$GITHUB_OUTPUT"
+        run: bash head/scripts/image-size.sh sprisa/opencode:baseline >> "$GITHUB_OUTPUT"
 
+      # Sizes are amd64 and decimal (1 MB = 1,000,000 bytes), like Docker's.
       - name: Report image size
-        id: compare
+        env:
+          CHANGED: ${{ steps.check-diff.outputs.changed }}
+          PR_UNPACKED: ${{ steps.pr-size.outputs.unpacked }}
+          PR_COMPRESSED: ${{ steps.pr-size.outputs.compressed }}
+          BASE_UNPACKED: ${{ steps.baseline-size.outputs.unpacked }}
+          BASE_COMPRESSED: ${{ steps.baseline-size.outputs.compressed }}
         run: |
-          PR_NUM="${{ github.event.number }}"
-          TAG="pr-${PR_NUM:-manual}"
-          PR_HUMAN="${{ steps.pr-size.outputs.human }}"
-          PR_BYTES=${{ steps.pr-size.outputs.bytes }}
-
-          if [ "${{ steps.check-diff.outputs.changed }}" = "true" ]; then
-            BASELINE_HUMAN="${{ steps.baseline-size.outputs.human }}"
-            BASELINE_BYTES=${{ steps.baseline-size.outputs.bytes }}
-            DIFF_BYTES=$(( PR_BYTES - BASELINE_BYTES ))
-            if [ "$DIFF_BYTES" -gt 0 ]; then
-              SIGN="+"
-              ABS_DIFF=$DIFF_BYTES
-            else
-              SIGN=""
-              ABS_DIFF=$(( -DIFF_BYTES ))
-            fi
-            DIFF_HUMAN=$(numfmt --to=iec --suffix=B "$ABS_DIFF" 2>/dev/null || echo "${ABS_DIFF} B")
-          fi
+          TAG="pr-${{ github.event.number || 'manual' }}"
+          human() { numfmt --to=si --round=nearest --format='%.1f' --suffix=B "$1"; }
+          diff_human() {
+            local diff=$(( $1 - $2 ))
+            if [ "$diff" -lt 0 ]; then echo "-$(human $(( -diff )))"; else echo "+$(human "$diff")"; fi
+          }
 
           {
             echo "## Docker image size"
             echo ""
-            echo "| Image | Size |"
-            echo "|---|---|"
-            echo "| This PR | $PR_HUMAN |"
-
-            if [ "${{ steps.check-diff.outputs.changed }}" = "true" ]; then
-              echo "| Baseline (main) | $BASELINE_HUMAN |"
-              echo "| **Difference** | **${SIGN}${DIFF_HUMAN}** |"
+            echo "| Image | Unpacked | Compressed (download) |"
+            echo "|---|---|---|"
+            if [ "$CHANGED" = "true" ]; then
+              echo "| Baseline (main) | $(human "$BASE_UNPACKED") | $(human "$BASE_COMPRESSED") |"
             fi
+            echo "| This PR | $(human "$PR_UNPACKED") | $(human "$PR_COMPRESSED") |"
+            if [ "$CHANGED" = "true" ]; then
+              echo "| **Difference** | **$(diff_human "$PR_UNPACKED" "$BASE_UNPACKED")** | **$(diff_human "$PR_COMPRESSED" "$BASE_COMPRESSED")** |"
+            fi
+          } > "$RUNNER_TEMP/size-comment.md"
 
+          {
+            cat "$RUNNER_TEMP/size-comment.md"
             echo ""
             echo "### PR layers"
             echo ""
@@ -130,46 +124,17 @@ jobs:
               --no-trunc | tail -n +2
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "pr: $PR_HUMAN ($PR_BYTES bytes)"
-
-          echo "pr-human=${PR_HUMAN}" >> "$GITHUB_OUTPUT"
-          echo "diff-human=${SIGN}${DIFF_HUMAN}" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/size-comment.md"
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PR_HUMAN="${{ steps.pr-size.outputs.human }}"
-
-          BODY=$(cat <<EOF
-          ## Docker image size
-
-          | Image | Size |
-          |---|---|
-          | This PR | $PR_HUMAN |
-          EOF
-          )
-
-          if [ "${{ steps.check-diff.outputs.changed }}" = "true" ]; then
-            BASELINE_HUMAN="${{ steps.baseline-size.outputs.human }}"
-            DIFF="${{ steps.compare.outputs.diff-human }}"
-            BODY=$(cat <<EOF
-          ## Docker image size comparison
-
-          | Image | Size |
-          |---|---|
-          | Baseline (main) | $BASELINE_HUMAN |
-          | This PR | $PR_HUMAN |
-          | **Difference** | **${DIFF}** |
-          EOF
-            )
-          fi
-
           cd head
           gh pr comment "${{ github.event.number }}" \
             --repo "${{ github.repository }}" \
-            --body "$BODY" --edit-last 2>/dev/null \
+            --body-file "$RUNNER_TEMP/size-comment.md" --edit-last 2>/dev/null \
           || gh pr comment "${{ github.event.number }}" \
             --repo "${{ github.repository }}" \
-            --body "$BODY"
+            --body-file "$RUNNER_TEMP/size-comment.md"

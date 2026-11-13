@@ -55,15 +55,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   build-essential pkg-config xz-utils \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
-# 1. Homebrew — partial clone with --filter=blob:none avoids downloading
-#    all past file versions, saving ~70 MB while retaining the git metadata
-#    Homebrew expects. The release tag is pinned for reproducible builds.
+# 1. Homebrew — shallow clone of the pinned release tag. Homebrew needs its
+#    .git directory (deleting it breaks brew), but not the project history:
+#    --depth 1 keeps a working repository without the ~50 MB of past commits
+#    and trees a --filter=blob:none partial clone still downloads. Cloning a
+#    tag leaves no origin/main, which makes the first `brew update` print
+#    "Not a valid ref", so also fetch main's tip (~2 MB) with the normal refspec.
+#    `brew cleanup` downloads Homebrew's portable Ruby (45 MB); drop it so brew
+#    fetches it on its first Ruby-backed command instead (~4s), like a fresh
+#    Homebrew install does.
 ARG HOMEBREW_VERSION=7.0.11
 RUN mkdir -p /home/linuxbrew \
   && chown opencode:opencode /home/linuxbrew \
-  && sudo -u opencode git clone --filter=blob:none \
+  && sudo -u opencode git clone --depth 1 \
     --branch "${HOMEBREW_VERSION}" \
     https://github.com/Homebrew/brew /home/linuxbrew/.linuxbrew/Homebrew \
+  && sudo -u opencode git -C /home/linuxbrew/.linuxbrew/Homebrew \
+    config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' \
+  && sudo -u opencode git -C /home/linuxbrew/.linuxbrew/Homebrew \
+    fetch --quiet --depth 1 origin main \
   && sudo -u opencode git -C /home/linuxbrew/.linuxbrew/Homebrew \
     checkout --quiet -B stable "${HOMEBREW_VERSION}" \
   && sudo -u opencode mkdir -p /home/linuxbrew/.linuxbrew/bin \
@@ -71,6 +81,7 @@ RUN mkdir -p /home/linuxbrew \
     /home/linuxbrew/.linuxbrew/Homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew \
   && sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew cleanup --prune=all \
   && sudo -u opencode rm -rf "$(sudo -u opencode /home/linuxbrew/.linuxbrew/bin/brew --cache)" \
+  && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/portable-ruby \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/cache \
   && rm -rf /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/*/doc \
@@ -85,7 +96,9 @@ ARG MISE_ZEROBREW_PLUGIN_COMMIT=998174989a12910f82c1f6e791a432731ed2647d
 # 1.5. mise — dev tool manager; pre-approved tools defined in the global config
 #     auto-install on first use at runtime. The release is
 #     pinned so Docker caching cannot silently retain an old moving target.
+# The release binary ships with symbols; stripping them saves ~18 MB.
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH=/usr/local/bin/mise sh \
+  && strip /usr/local/bin/mise \
   && mkdir -p /opt/mise \
   && MISE_DATA_DIR=/opt/mise mise plugins install zerobrew "https://github.com/kennyg/mise-zerobrew#${MISE_ZEROBREW_PLUGIN_COMMIT}" \
   && sed -i '/quoted_path .. " install /i\    cmd.exec(quoted_zb .. " --root " .. quoted_path .. " init")' /opt/mise/plugins/zerobrew/hooks/backend_install.lua
@@ -207,8 +220,13 @@ RUN echo "locking mise tools for opencode ${OPENCODE_VERSION}" \
   && chown opencode:opencode /etc/mise /etc/mise/mise.lock \
   && chown -R opencode:opencode /opt/mise
 
-# Verify runtime and set up login-shell PATH and auto-install handler
+# Verify runtime and set up login-shell PATH and auto-install handler.
+# The version check leaves Bun's extracted native library (~7 MB) in /tmp and
+# opencode logs under /root; Bun re-extracts at runtime, so drop both.
+# Only chown the home files this step creates: chown -R over the whole home
+# would copy the zerobrew files from the layer above into this one.
 RUN opencode --version \
+  && rm -rf /tmp/.bun-* /tmp/opencode /root/.local/share/opencode /root/.local/state/opencode \
   && install -m 0644 /dev/null /etc/mise/empty.toml \
   && mkdir -p /etc/opencode \
   && printf '%s\n' '{"$schema":"https://opencode.ai/config.json","instructions":["/etc/opencode/mise-instructions.md"]}' > /etc/opencode/opencode.json \
@@ -238,7 +256,7 @@ RUN opencode --version \
   && mkdir -p /opt/mise/shims \
   && chown opencode:opencode /opt/mise/shims \
   && mkdir -p /home/opencode/workspace \
-  && chown -R opencode:opencode /home/opencode
+  && chown -R opencode:opencode /home/opencode/.zshrc /home/opencode/.config /home/opencode/workspace
 
 USER opencode
 ENV HOME=/home/opencode
