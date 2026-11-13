@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 
 
 class ReleaseAutomationTests(unittest.TestCase):
@@ -34,6 +34,7 @@ class ReleaseAutomationTests(unittest.TestCase):
             "DOCKER_CALLS": str(self.cwd / "docker-calls.jsonl"),
             "RELEASE_FIXTURE": str(self.cwd / "releases.json"),
             "RELEASE_EXISTS": "0",
+            "IMAGES_EXIST": "",
             "API_FAIL": "0",
         }
         self.mock("gh", '''
@@ -56,8 +57,11 @@ elif args[:2] != ["release", "create"]:
 ''')
         self.mock("docker", '''
 import json, os, sys
+args = sys.argv[1:]
 with open(os.environ["DOCKER_CALLS"], "a") as out:
-    out.write(json.dumps(sys.argv[1:]) + "\\n")
+    out.write(json.dumps(args) + "\\n")
+if args[:3] == ["buildx", "imagetools", "inspect"]:
+    sys.exit(0 if args[3] in os.environ["IMAGES_EXIST"].split(",") else 1)
 ''')
         self.run_command("git", "init", "-q")
         self.run_command("git", "add", "version.txt", "version-v1.txt")
@@ -95,6 +99,13 @@ with open(os.environ["DOCKER_CALLS"], "a") as out:
         path = self.cwd / f"{name}-calls.jsonl"
         return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
+    def builds(self):
+        return [args for args in self.calls("docker") if args[:2] == ["buildx", "build"]]
+
+    @staticmethod
+    def tags(args):
+        return [args[i + 1] for i, arg in enumerate(args) if arg == "-t"]
+
     def test_discovery_paginates_and_selects_highest_stable_version(self):
         result = self.run_command("bash", "scripts/latest-releases.sh")
         self.assertEqual(json.loads(result.stdout), {"v1": "1.19.10", "v2": "2.10.0"})
@@ -124,11 +135,10 @@ with open(os.environ["DOCKER_CALLS"], "a") as out:
 
     def test_publish_pushes_both_tracks_and_sets_release_target_and_latest(self):
         self.run_command("task", "publish")
-        docker = self.calls("docker")
-        self.assertEqual(len(docker), 2)
-        tags = lambda args: [args[i + 1] for i, arg in enumerate(args) if arg == "-t"]
-        self.assertEqual(tags(docker[0]), ["docker.io/sprisa/opencode:2.2.4", "docker.io/sprisa/opencode:latest", "docker.io/sprisa/opencode:v2"])
-        self.assertEqual(tags(docker[1]), ["docker.io/sprisa/opencode:1.19.5", "docker.io/sprisa/opencode:v1"])
+        builds = self.builds()
+        self.assertEqual(len(builds), 2)
+        self.assertEqual(self.tags(builds[0]), ["docker.io/sprisa/opencode:2.2.4", "docker.io/sprisa/opencode:latest", "docker.io/sprisa/opencode:v2"])
+        self.assertEqual(self.tags(builds[1]), ["docker.io/sprisa/opencode:1.19.5", "docker.io/sprisa/opencode:v1"])
         releases = [args for args in self.calls("gh") if args[:2] == ["release", "create"]]
         self.assertEqual(len(releases), 2)
         self.assertIn("--latest", releases[0])
@@ -137,10 +147,25 @@ with open(os.environ["DOCKER_CALLS"], "a") as out:
             self.assertEqual(args[args.index("--target") + 1], self.sha)
             self.assertEqual(args[args.index("--repo") + 1], "sprisa/opencode-server")
 
-    def test_existing_releases_are_retained_while_image_aliases_are_refreshed(self):
-        self.env["RELEASE_EXISTS"] = "1"
+    def test_publish_skips_a_track_whose_version_is_already_published(self):
+        self.env["IMAGES_EXIST"] = "docker.io/sprisa/opencode:1.19.5"
         self.run_command("task", "publish")
-        self.assertEqual(len(self.calls("docker")), 2)
+        builds = self.builds()
+        self.assertEqual(len(builds), 1)
+        self.assertEqual(self.tags(builds[0]), ["docker.io/sprisa/opencode:2.2.4", "docker.io/sprisa/opencode:latest", "docker.io/sprisa/opencode:v2"])
+
+    def test_existing_releases_and_images_are_left_alone(self):
+        self.env["RELEASE_EXISTS"] = "1"
+        self.env["IMAGES_EXIST"] = "docker.io/sprisa/opencode:2.2.4,docker.io/sprisa/opencode:1.19.5"
+        self.run_command("task", "publish")
+        self.assertEqual(self.builds(), [])
+        self.assertFalse(any(args[:2] == ["release", "create"] for args in self.calls("gh")))
+
+    def test_force_republishes_existing_images(self):
+        self.env["RELEASE_EXISTS"] = "1"
+        self.env["IMAGES_EXIST"] = "docker.io/sprisa/opencode:2.2.4,docker.io/sprisa/opencode:1.19.5"
+        self.run_command("task", "publish", "FORCE=true")
+        self.assertEqual(len(self.builds()), 2)
         self.assertFalse(any(args[:2] == ["release", "create"] for args in self.calls("gh")))
 
     def test_release_notes_select_only_older_tags_in_current_history(self):

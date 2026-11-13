@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Exercise the real, major-specific entrypoint. Usage: bash test-server-e2e.sh <image>
+# Exercise the real, major-specific entrypoint. Usage: bash tests/test-server-e2e.sh <image>
 set -euo pipefail
 
-IMAGE="${1:?usage: test-server-e2e.sh <image>}"
+IMAGE="${1:?usage: tests/test-server-e2e.sh <image>}"
 NAME="opencode-server-e2e-$$"
 PORT=4186
 VERSION="$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.version"}}' "$IMAGE")"

@@ -2,6 +2,11 @@ name: Publish
 
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: Republish versions that are already on Docker Hub
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -39,7 +44,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Publish both tracks
+      - name: Publish new versions
         env:
           GH_TOKEN: ${{ github.token }}
-        run: task publish
+        run: task publish FORCE=${{ inputs.force }}

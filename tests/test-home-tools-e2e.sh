@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end test for the delayed home-tool installer.
-# Usage: test-home-tools-e2e.sh [image]
+# Usage: bash tests/test-home-tools-e2e.sh [image]
 set -euo pipefail
 
 IMAGE="${1:-opencode-test:latest}"
@@ -121,7 +121,7 @@ if [ "${installed}" -ne 1 ]; then
 fi
 
 # The system config and project config must remain lazy.
-if docker exec "${NAME}" bash -c 'for path in /opt/mise/installs/github-jqlang-jq/*/jq /opt/mise/installs/node/*/bin/node; do [ -x "$path" ] && exit 0; done; exit 1'; then
+if docker exec "${NAME}" bash -c 'for path in /opt/mise/installs/jq/*/jq /opt/mise/installs/node/*/bin/node; do [ -x "$path" ] && exit 0; done; exit 1'; then
   echo "system/project tool was eagerly installed" >&2
   exit 1
 fi
