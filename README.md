@@ -184,7 +184,14 @@ tells agents to try mise before apt.
 <summary><strong>Other package managers and paths</strong></summary>
 
 - **Homebrew** (`brew`) is installed under `/home/linuxbrew/.linuxbrew`. It runs on
-  its own bundled Ruby.
+  its own Ruby, which it downloads the first time you run a `brew` command that
+  needs it. That takes a few seconds. Formulas with a prebuilt bottle install
+  directly. Formulas without one, which includes most third-party taps, count
+  as builds from source, and Homebrew refuses those unless `gcc` or `clang` is
+  on `PATH`. That's true even when the formula only copies a prebuilt binary.
+  For those, run `sudo apt-get install -y gcc` first (about 170 MB). Formulas
+  that really compile code need `sudo apt-get install -y build-essential`
+  (about 260 MB).
 - **zerobrew** (`zb`), a faster Homebrew client, is at `/usr/local/bin/zb`.
 - **`~/.local/bin`** is on `PATH` and writable, so you can drop your own binaries
   there.
@@ -294,6 +301,7 @@ The end-to-end tests run against a built image:
 ```sh
 bash tests/test-server-e2e.sh sprisa/opencode:<version>
 bash tests/test-toolchain-e2e.sh sprisa/opencode:<version>
+bash tests/test-homebrew-e2e.sh sprisa/opencode:<version>
 bash tests/test-home-tools-e2e.sh sprisa/opencode:<version>
 bash tests/test-mise-lock-e2e.sh sprisa/opencode:<version>
 ```

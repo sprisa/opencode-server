@@ -85,6 +85,9 @@ jobs:
           test "package managers and zerobrew-backed lazy tools work in the real image" \
             "bash tests/test-toolchain-e2e.sh opencode-test:latest"
 
+          test "Homebrew install, upgrade, uninstall, taps, and update work" \
+            "bash tests/test-homebrew-e2e.sh opencode-test:latest"
+
           test "locked tools install without version lookups; user tools resolve latest" \
             "bash tests/test-mise-lock-e2e.sh opencode-test:latest"
 
