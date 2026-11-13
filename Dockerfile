@@ -26,7 +26,13 @@ FROM ubuntu:26.04@sha256:b7f48194d4d8b763a478a621cdc81c27be222ba2206ca3ca6bc42b4
 ENV DEBIAN_FRONTEND=noninteractive
 
 # CLI utilities for day-to-day dev work (git, curl, etc.).
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Publishing reuses cached layers, so this apt layer and everything built on it
+# stay byte-identical between releases and nodes only download what changed.
+# The Taskfile sets APT_REFRESH to the current month (YYYY-MM), so published
+# images still pick up Ubuntu security updates once a month.
+ARG APT_REFRESH=manual
+RUN echo "apt refresh: ${APT_REFRESH}" \
+  && apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates curl git openssh-client unzip \
   less libatomic1 sudo tini tzdata \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
@@ -96,9 +102,10 @@ ARG MISE_ZEROBREW_PLUGIN_COMMIT=998174989a12910f82c1f6e791a432731ed2647d
 # 1.5. mise — dev tool manager; pre-approved tools defined in the global config
 #     auto-install on first use at runtime. The release is
 #     pinned so Docker caching cannot silently retain an old moving target.
-# The release binary ships with symbols; stripping them saves ~18 MB.
+# Don't strip the release binary: it saves 18 MB unpacked but only 3 MB
+# compressed, and QEMU can't run a stripped mise ("Inconsistency detected by
+# ld.so"), which breaks emulated multi-arch builds.
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH=/usr/local/bin/mise sh \
-  && strip /usr/local/bin/mise \
   && mkdir -p /opt/mise \
   && MISE_DATA_DIR=/opt/mise mise plugins install zerobrew "https://github.com/kennyg/mise-zerobrew#${MISE_ZEROBREW_PLUGIN_COMMIT}" \
   && sed -i '/quoted_path .. " install /i\    cmd.exec(quoted_zb .. " --root " .. quoted_path .. " init")' /opt/mise/plugins/zerobrew/hooks/backend_install.lua
@@ -145,7 +152,6 @@ RUN major="$(printf '%s' "${OPENCODE_VERSION}" | cut -d. -f1)" \
 FROM runtime
 
 ARG OPENCODE_VERSION
-ARG IMAGE_CREATED
 
 # mise/auto-install shims go LAST: they are "tool not installed" fallbacks that
 # exec `mise exec <tool>`, so anything explicitly installed into a real bin dir
@@ -162,21 +168,10 @@ ENV OPENCODE_PRINT_LOGS=false
 # Do not set a default password ENV: v2 generates one when both password names
 # are absent, and OPENCODE_PASSWORD takes precedence over the legacy name.
 
-LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/sprisa/opencode-server/refs/heads/main/README.md" \
-  org.opencontainers.image.created="${IMAGE_CREATED}" \
-  org.opencontainers.image.description="Opencode server for general-purpose agent development. Supports web desktop & server mode." \
-  org.opencontainers.image.documentation="https://github.com/sprisa/opencode-server" \
-  org.opencontainers.image.source="https://github.com/sprisa/opencode-server" \
-  org.opencontainers.image.title="opencode-server" \
-  org.opencontainers.image.url="https://github.com/sprisa/opencode-server" \
-  org.opencontainers.image.vendor="Sprisa Inc" \
-  org.opencontainers.image.version="${OPENCODE_VERSION}" \
-  io.artifacthub.package.license="MPL-2.0" \
-  io.artifacthub.package.maintainers='[{"name":"Gabriel Meola","email":"banter@gabe.mx"}]' \
-  io.artifacthub.package.keywords="opencode,server,docker,ai,code,editor,development"
-
 # Copy layers
-# Ordered by most stable layers first so cache can be reused.
+# Ordered by most stable layers first so cache can be reused. The opencode
+# binary changes every release; small files that change independently (mise
+# config, entrypoints) come after it so editing them doesn't rebuild it.
 COPY --from=builder --chown=opencode:opencode /home/linuxbrew /home/linuxbrew
 
 # Zerobrew — fast Homebrew alternative; mise zerobrew backend.
@@ -187,11 +182,12 @@ COPY --from=builder --chown=opencode:opencode /home/opencode/.local/share/zerobr
 # Mise — dev tool manager; auto-installs tools defined in the global config.
 COPY --from=builder /usr/local/bin/mise /usr/local/bin/mise
 COPY --from=builder --chown=opencode:opencode /opt/mise /opt/mise
-COPY mise-config.toml /etc/mise/config.toml
-COPY mise-instructions.md /etc/opencode/mise-instructions.md
 
 # Opencode
 COPY --from=builder /opt/opencode /usr/local/bin/opencode
+
+COPY mise-config.toml /etc/mise/config.toml
+COPY mise-instructions.md /etc/opencode/mise-instructions.md
 
 # Select the major-specific entrypoint at build time. Keep these late so startup
 # script changes reuse the toolchain layers.
@@ -265,3 +261,19 @@ WORKDIR /home/opencode/workspace
 EXPOSE 4096
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]
+
+# Labels go last: IMAGE_CREATED changes on every build, and declaring it
+# earlier puts it in the cache key of every later RUN, so none could be reused.
+ARG IMAGE_CREATED
+LABEL io.artifacthub.package.readme-url="https://raw.githubusercontent.com/sprisa/opencode-server/refs/heads/main/README.md" \
+  org.opencontainers.image.created="${IMAGE_CREATED}" \
+  org.opencontainers.image.description="Opencode server for general-purpose agent development. Supports web desktop & server mode." \
+  org.opencontainers.image.documentation="https://github.com/sprisa/opencode-server" \
+  org.opencontainers.image.source="https://github.com/sprisa/opencode-server" \
+  org.opencontainers.image.title="opencode-server" \
+  org.opencontainers.image.url="https://github.com/sprisa/opencode-server" \
+  org.opencontainers.image.vendor="Sprisa Inc" \
+  org.opencontainers.image.version="${OPENCODE_VERSION}" \
+  io.artifacthub.package.license="MPL-2.0" \
+  io.artifacthub.package.maintainers='[{"name":"Gabriel Meola","email":"banter@gabe.mx"}]' \
+  io.artifacthub.package.keywords="opencode,server,docker,ai,code,editor,development"
