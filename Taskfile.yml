@@ -15,6 +15,18 @@ vars:
     sh: cat version.txt | tr -d '[:space:]'
   VERSION_V1:
     sh: cat version-v1.txt | tr -d '[:space:]'
+  # Monthly apt refresh: see APT_REFRESH in the Dockerfile.
+  APT_REFRESH:
+    sh: date -u +%Y-%m
+  # Build cache on ghcr.io, one tag per line, kept off Docker Hub so users only
+  # see release tags. Pushes read both (v1 and v2 share every layer below the
+  # opencode binary) and write their own, so unchanged layers keep their
+  # digests across releases and nodes only download what changed. Without a
+  # ghcr.io login, the import only warns and the export is skipped.
+  CACHE_REPO: ghcr.io/{{.OWNER}}/opencode-buildcache
+  CACHE_FROM: >-
+    --cache-from type=registry,ref={{.CACHE_REPO}}:v2
+    --cache-from type=registry,ref={{.CACHE_REPO}}:v1
 
 tasks:
   default:
@@ -52,7 +64,7 @@ tasks:
   docker:build:
     desc: "Build the image locally (tag: sprisa/opencode:<version>)"
     cmds:
-      - docker build --build-arg OPENCODE_VERSION={{.VERSION}} --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" -t {{.OCI}}:{{.VERSION}} .
+      - docker build --build-arg OPENCODE_VERSION={{.VERSION}} --build-arg APT_REFRESH={{.APT_REFRESH}} --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" -t {{.OCI}}:{{.VERSION}} .
 
   docker:push:
     desc: "Build and push multi-arch v2 image to Docker Hub with <version>, :latest, and :v2 tags"
@@ -61,7 +73,10 @@ tasks:
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --build-arg OPENCODE_VERSION={{.VERSION}} \
+          --build-arg APT_REFRESH={{.APT_REFRESH}} \
           --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+          {{.CACHE_FROM}} \
+          --cache-to type=registry,ref={{.CACHE_REPO}}:v2,mode=max,ignore-error=true \
           --push \
           -t {{.OCI}}:{{.VERSION}} \
           -t {{.OCI}}:latest \
@@ -131,7 +146,7 @@ tasks:
   docker:build:v1:
     desc: "Build the v1 image locally (tag: sprisa/opencode:<v1-version>)"
     cmds:
-      - docker build --build-arg OPENCODE_VERSION={{.VERSION_V1}} --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" -t {{.OCI}}:{{.VERSION_V1}} .
+      - docker build --build-arg OPENCODE_VERSION={{.VERSION_V1}} --build-arg APT_REFRESH={{.APT_REFRESH}} --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" -t {{.OCI}}:{{.VERSION_V1}} .
 
   docker:push:v1:
     desc: "Build and push multi-arch v1 image to Docker Hub with <version> and :v1 tags (:latest stays on v2)"
@@ -140,7 +155,10 @@ tasks:
         docker buildx build \
           --platform linux/amd64,linux/arm64 \
           --build-arg OPENCODE_VERSION={{.VERSION_V1}} \
+          --build-arg APT_REFRESH={{.APT_REFRESH}} \
           --build-arg IMAGE_CREATED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+          {{.CACHE_FROM}} \
+          --cache-to type=registry,ref={{.CACHE_REPO}}:v1,mode=max,ignore-error=true \
           --push \
           -t {{.OCI}}:{{.VERSION_V1}} \
           -t {{.OCI}}:v1 \

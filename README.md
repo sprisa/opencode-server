@@ -326,7 +326,15 @@ they are. It also creates any missing GitHub releases at the current commit.
 Only v2 releases are marked as GitHub's latest release.
 
 To ship image changes without a new opencode version, republish with
-`task publish FORCE=true`. Other tasks:
+`task publish FORCE=true`.
+
+Publishing reuses a build cache at `ghcr.io/sprisa/opencode-buildcache`, so
+layers that didn't change keep their digests and a new release mostly
+downloads just the opencode binary. The cache stays off Docker Hub. To use it
+from your own machine, run `docker login ghcr.io` with a token that can write
+packages. Without it, publishing still works, just without the cache. The apt
+layer refreshes once a month (`APT_REFRESH`), so the first release of a month
+downloads the whole image. Other tasks:
 
 ```sh
 task docker:login     # Log in to Docker Hub (needs $DOCKER_USER and $DOCKER_PASS)

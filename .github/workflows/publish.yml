@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  packages: write # build cache on ghcr.io
 
 concurrency:
   group: opencode-publish
@@ -43,6 +44,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry (build cache)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Publish new versions
         env:
