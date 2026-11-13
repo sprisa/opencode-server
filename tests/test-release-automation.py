@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offline integration tests for release discovery, updating, publishing, and notes."""
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -103,8 +104,11 @@ if args[:3] == ["buildx", "imagetools", "inspect"]:
         return [args for args in self.calls("docker") if args[:2] == ["buildx", "build"]]
 
     @staticmethod
-    def tags(args):
-        return [args[i + 1] for i, arg in enumerate(args) if arg == "-t"]
+    def flag_values(args, flag):
+        return [args[i + 1] for i, arg in enumerate(args) if arg == flag]
+
+    def tags(self, args):
+        return self.flag_values(args, "-t")
 
     def test_discovery_paginates_and_selects_highest_stable_version(self):
         result = self.run_command("bash", "scripts/latest-releases.sh")
@@ -139,6 +143,18 @@ if args[:3] == ["buildx", "imagetools", "inspect"]:
         self.assertEqual(len(builds), 2)
         self.assertEqual(self.tags(builds[0]), ["docker.io/sprisa/opencode:2.2.4", "docker.io/sprisa/opencode:latest", "docker.io/sprisa/opencode:v2"])
         self.assertEqual(self.tags(builds[1]), ["docker.io/sprisa/opencode:1.19.5", "docker.io/sprisa/opencode:v1"])
+        # Each line reads both build caches and writes its own; apt refreshes monthly.
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+        for args, track in [(builds[0], "v2"), (builds[1], "v1")]:
+            with self.subTest(track=track):
+                self.assertEqual(self.flag_values(args, "--cache-from"), [
+                    "type=registry,ref=docker.io/sprisa/opencode:buildcache-v2",
+                    "type=registry,ref=docker.io/sprisa/opencode:buildcache-v1",
+                ])
+                self.assertEqual(self.flag_values(args, "--cache-to"), [
+                    f"type=registry,ref=docker.io/sprisa/opencode:buildcache-{track},mode=max,ignore-error=true",
+                ])
+                self.assertIn(f"APT_REFRESH={month}", self.flag_values(args, "--build-arg"))
         releases = [args for args in self.calls("gh") if args[:2] == ["release", "create"]]
         self.assertEqual(len(releases), 2)
         self.assertIn("--latest", releases[0])
