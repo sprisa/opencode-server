@@ -3,8 +3,8 @@
 # Usage: bash tests/test-homebrew-e2e.sh <image>
 #
 # The image trims Homebrew to save space: a shallow clone of the pinned release
-# and no bundled portable Ruby. Deleting Homebrew's .git broke brew before, so
-# this covers the whole lifecycle rather than just `brew --version`.
+# and no bundled portable Ruby. A broken Homebrew repository still passes
+# `brew --version`, so this covers the whole lifecycle.
 set -euo pipefail
 
 IMAGE="${1:?usage: tests/test-homebrew-e2e.sh <image>}"
