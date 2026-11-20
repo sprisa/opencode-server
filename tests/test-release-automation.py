@@ -120,6 +120,24 @@ if args[:3] == ["buildx", "imagetools", "inspect"]:
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("No stable v1 release", result.stderr)
 
+    def test_pending_lists_every_newer_stable_release_oldest_first(self):
+        self.fixture([[self.release("v2.2.4"), self.release("v2.10.0"), self.release("v2.2.8"),
+                       self.release("v2.2.9"), self.release("v2.2.9"), self.release("v2.11.0", prerelease=True),
+                       self.release("v1.19.10"), self.release("v3.0.0")]])
+        result = self.run_command("bash", "scripts/pending-releases.sh", "v2", "2.2.4")
+        self.assertEqual(result.stdout.split(), ["2.2.8", "2.2.9", "2.10.0"])
+        result = self.run_command("bash", "scripts/pending-releases.sh", "v1", "1.19.5")
+        self.assertEqual(result.stdout.split(), ["1.19.10"])
+
+    def test_pending_is_empty_when_up_to_date(self):
+        result = self.run_command("bash", "scripts/pending-releases.sh", "v2", "2.10.0")
+        self.assertEqual(result.stdout, "")
+
+    def test_pending_reports_api_failure(self):
+        self.env["API_FAIL"] = "1"
+        result = self.run_command("bash", "scripts/pending-releases.sh", "v2", "2.2.4", check=False)
+        self.assertNotEqual(result.returncode, 0)
+
     def test_update_advances_both_pins_numerically(self):
         self.run_command("task", "update")
         self.assertEqual((self.cwd / "version.txt").read_text(), "2.10.0\n")
