@@ -1,13 +1,25 @@
 # Automated check for upstream opencode releases.
 # Runs every 12 hours, once per supported major-version track.
-# If a new release is found on a track, bumps that track's version file
-# (v2 -> version.txt [default], v1 -> version-v1.txt [legacy]) and opens a PR.
+# Every upstream release newer than a track's version file
+# (v2 -> version.txt [default], v1 -> version-v1.txt [legacy]) gets its own PR,
+# one per version. Re-runs update existing PRs instead of opening duplicates,
+# and PRs for versions at or below the current pin are closed as superseded.
+# Merging a release PR re-runs the check so the remaining PRs rebase onto main.
 name: "opencode release checker"
 
 on:
   schedule:
     - cron: "0 */12 * * *"
+  push:
+    branches: [main]
+    paths:
+      - version.txt
+      - version-v1.txt
   workflow_dispatch:
+
+concurrency:
+  group: release-checker
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -35,16 +47,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get upstream latest (${{ matrix.track }})
-        id: latest
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RELEASES=$(bash ./scripts/latest-releases.sh)
-          VERSION=$(printf '%s' "$RELEASES" | jq -er --arg track "${{ matrix.track }}" '.[$track]')
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Upstream ${{ matrix.track }}: ${VERSION:-none}"
-
       - name: Read current version
         id: current
         run: |
@@ -52,37 +54,55 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Current: ${VERSION}"
 
-      - name: Decide whether to bump
-        id: decide
-        run: |
-          LATEST="${{ steps.latest.outputs.version }}"
-          CURRENT="${{ steps.current.outputs.version }}"
-          if jq -en --arg latest "$LATEST" --arg current "$CURRENT" \
-            '($latest | split(".") | map(tonumber)) > ($current | split(".") | map(tonumber))' >/dev/null; then
-            echo "update=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::${{ matrix.track }} is up to date (${CURRENT}; upstream: ${LATEST})"
-            echo "update=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Reset PR branch to latest main
-        if: steps.decide.outputs.update == 'true'
-        env:
-          PR_VERSION: ${{ steps.latest.outputs.version }}
-        run: |
-          PR_BRANCH="pr/opencode-release/v${PR_VERSION}"
-          git fetch origin "${{ env.TARGET_BRANCH }}"
-          git branch -D "$PR_BRANCH" 2>/dev/null || true
-          git checkout -b "$PR_BRANCH" "origin/${{ env.TARGET_BRANCH }}"
-          git push origin "$PR_BRANCH" --force
-
-      - name: Bump and create PR
-        if: steps.decide.outputs.update == 'true'
+      - name: List pending upstream releases (${{ matrix.track }})
+        id: pending
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          VERSIONS=$(bash ./scripts/pending-releases.sh "${{ matrix.track }}" "${{ steps.current.outputs.version }}" | paste -sd' ' -)
+          echo "versions=${VERSIONS}" >> "$GITHUB_OUTPUT"
+          if [ -z "$VERSIONS" ]; then
+            echo "::notice::${{ matrix.track }} is up to date (${{ steps.current.outputs.version }})"
+          else
+            echo "Pending ${{ matrix.track }}: ${VERSIONS}"
+          fi
+
+      - name: Close superseded release PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT: ${{ steps.current.outputs.version }}
+        run: |
+          PREFIX="pr/opencode-release/${{ matrix.track }}."
+          gh pr list --state open --base "${{ env.TARGET_BRANCH }}" --json number,headRefName \
+            | jq -r --arg prefix "$PREFIX" --arg current "$CURRENT" '
+                .[]
+                | select(.headRefName | startswith($prefix))
+                | select((.headRefName | ltrimstr("pr/opencode-release/v") | split(".") | map(tonumber))
+                         <= ($current | split(".") | map(tonumber)))
+                | "\(.number) \(.headRefName)"
+              ' \
+            | while read -r number branch; do
+                echo "Closing #${number} (${branch}): ${{ matrix.version_file }} is already ${CURRENT}"
+                gh pr close "$number" --delete-branch \
+                  --comment "Superseded: \`${{ matrix.version_file }}\` on \`${{ env.TARGET_BRANCH }}\` is already v${CURRENT}."
+              done
+
+      - name: Bump and create one PR per release
+        if: steps.pending.outputs.versions != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSIONS: ${{ steps.pending.outputs.versions }}
           VERSION_FILE: ${{ matrix.version_file }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          ./scripts/bump-version.sh "$PR_VERSION" "${{ env.TARGET_BRANCH }}" "$VERSION_FILE"
+          git fetch origin "${{ env.TARGET_BRANCH }}"
+          for PR_VERSION in $VERSIONS; do
+            echo "::group::v${PR_VERSION}"
+            # Rebuild each PR branch from latest main so it only changes the version file.
+            PR_BRANCH="pr/opencode-release/v${PR_VERSION}"
+            git checkout -B "$PR_BRANCH" "origin/${{ env.TARGET_BRANCH }}"
+            git push origin "$PR_BRANCH" --force
+            ./scripts/bump-version.sh "$PR_VERSION" "${{ env.TARGET_BRANCH }}" "$VERSION_FILE"
+            echo "::endgroup::"
+          done
